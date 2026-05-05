@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
 import signal
+import sys
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -106,9 +108,25 @@ class SessionManager:
             run_dir.mkdir(parents=True, exist_ok=True)
             (run_dir / f"{project.name}.session").write_text(str(session.id))
 
+            # write per-session mcp.json (so MYORCH_PROJECT is correct per session)
+            session_mcp_path = self.settings.data_dir / "run" / f"{project.name}.mcp.json"
+            session_mcp_path.write_text(json.dumps({
+                "mcpServers": {
+                    "myorch-memory": {
+                        "command": sys.executable,
+                        "args": ["-m", "myorch.mcp_server"],
+                        "env": {
+                            "MYORCH_DB": str(self.settings.db_path),
+                            "MYORCH_PROJECT": project.name,
+                        },
+                    }
+                }
+            }, indent=2))
+
             argv = self._claude_argv_factory(
                 project=project, digest_path=digest_path,
                 claude_uuid=claude_uuid, is_resume=is_resume,
+                mcp_config_path=session_mcp_path,
             )
             env = {**os.environ,
                    "MYORCH_DB": str(self.settings.db_path),
@@ -156,12 +174,12 @@ class SessionManager:
 
 
 def _default_claude_argv(project, digest_path: Path, claude_uuid: str,
-                         is_resume: bool) -> list[str]:
+                         is_resume: bool, mcp_config_path: Path) -> list[str]:
     argv = ["claude"]
     if is_resume:
         argv.extend(["--resume", claude_uuid])
     else:
         argv.extend(["--session-id", claude_uuid])
-    argv.extend(["--mcp-config", str(Path.home() / ".myorch" / "mcp.json")])
+    argv.extend(["--mcp-config", str(mcp_config_path)])
     argv.extend(["--append-system-prompt", f"@{digest_path}"])
     return argv
