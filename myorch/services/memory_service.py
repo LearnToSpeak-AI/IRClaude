@@ -3,7 +3,7 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
-from myorch.models import Project, Session, SessionBrief, SessionStatus
+from myorch.models import Decision, Project, Recall, RecallHit, Session, SessionBrief, SessionStatus
 
 
 def _row_to_project(row: sqlite3.Row) -> Project:
@@ -122,5 +122,85 @@ class MemoryService:
                 id=r["id"], started_at=r["started_at"], ended_at=r["ended_at"],
                 summary=r["summary"], status=SessionStatus(r["status"]),
             )
+            for r in rows
+        ]
+
+    # ---- decisions ----
+    def save_decision(self, project_id: int, d: Decision) -> Decision:
+        cur = self.conn.execute(
+            """INSERT INTO decisions(project_id, session_id, title, body, tags)
+               VALUES (?, ?, ?, ?, ?)""",
+            (project_id, d.session_id, d.title, d.body,
+             json.dumps(d.tags) if d.tags else None),
+        )
+        row = self.conn.execute(
+            "SELECT * FROM decisions WHERE id=?", (cur.lastrowid,)
+        ).fetchone()
+        return Decision(
+            id=row["id"], project_id=row["project_id"], session_id=row["session_id"],
+            title=row["title"], body=row["body"],
+            tags=json.loads(row["tags"]) if row["tags"] else [],
+            created_at=row["created_at"],
+        )
+
+    def list_decisions(self, project_id: int, tag: str | None = None) -> list[Decision]:
+        rows = self.conn.execute(
+            "SELECT * FROM decisions WHERE project_id=? ORDER BY created_at DESC, id DESC",
+            (project_id,),
+        ).fetchall()
+        out = [
+            Decision(
+                id=r["id"], project_id=r["project_id"], session_id=r["session_id"],
+                title=r["title"], body=r["body"],
+                tags=json.loads(r["tags"]) if r["tags"] else [],
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+        if tag is not None:
+            out = [d for d in out if tag in d.tags]
+        return out
+
+    # ---- recalls ----
+    def save_recall(self, project_id: int, r: Recall) -> Recall:
+        cur = self.conn.execute(
+            "INSERT INTO recalls(project_id, text, tags) VALUES (?, ?, ?)",
+            (project_id, r.text, json.dumps(r.tags) if r.tags else None),
+        )
+        row = self.conn.execute(
+            "SELECT * FROM recalls WHERE id=?", (cur.lastrowid,)
+        ).fetchone()
+        return Recall(
+            id=row["id"], project_id=row["project_id"], text=row["text"],
+            tags=json.loads(row["tags"]) if row["tags"] else [],
+            created_at=row["created_at"],
+        )
+
+    def list_recalls(self, project_id: int) -> list[Recall]:
+        rows = self.conn.execute(
+            "SELECT * FROM recalls WHERE project_id=? ORDER BY created_at DESC, id DESC",
+            (project_id,),
+        ).fetchall()
+        return [
+            Recall(
+                id=r["id"], project_id=r["project_id"], text=r["text"],
+                tags=json.loads(r["tags"]) if r["tags"] else [],
+                created_at=r["created_at"],
+            )
+            for r in rows
+        ]
+
+    # ---- search ----
+    def recall(self, project_id: int, query: str, limit: int = 10) -> list[RecallHit]:
+        rows = self.conn.execute(
+            """SELECT origin, snippet(memory_fts, 0, '<<', '>>', '...', 16) AS snip,
+                      bm25(memory_fts) AS score
+               FROM memory_fts
+               WHERE memory_fts MATCH ? AND project_id = ?
+               ORDER BY score LIMIT ?""",
+            (query, project_id, limit),
+        ).fetchall()
+        return [
+            RecallHit(origin=r["origin"], score=float(r["score"]), snippet=r["snip"])
             for r in rows
         ]
