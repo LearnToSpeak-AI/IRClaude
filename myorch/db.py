@@ -63,6 +63,44 @@ CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(
 );
 """
 
+SCHEMA += """
+CREATE TRIGGER IF NOT EXISTS trg_decisions_ai AFTER INSERT ON decisions BEGIN
+    INSERT INTO memory_fts(rowid, content, project_id, origin)
+    VALUES (NULL, NEW.title || ' ' || NEW.body, NEW.project_id, 'decision:' || NEW.id);
+END;
+CREATE TRIGGER IF NOT EXISTS trg_decisions_ad AFTER DELETE ON decisions BEGIN
+    DELETE FROM memory_fts WHERE origin = 'decision:' || OLD.id;
+END;
+CREATE TRIGGER IF NOT EXISTS trg_decisions_au AFTER UPDATE ON decisions BEGIN
+    DELETE FROM memory_fts WHERE origin = 'decision:' || OLD.id;
+    INSERT INTO memory_fts(rowid, content, project_id, origin)
+    VALUES (NULL, NEW.title || ' ' || NEW.body, NEW.project_id, 'decision:' || NEW.id);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_recalls_ai AFTER INSERT ON recalls BEGIN
+    INSERT INTO memory_fts(rowid, content, project_id, origin)
+    VALUES (NULL, NEW.text, NEW.project_id, 'recall:' || NEW.id);
+END;
+CREATE TRIGGER IF NOT EXISTS trg_recalls_ad AFTER DELETE ON recalls BEGIN
+    DELETE FROM memory_fts WHERE origin = 'recall:' || OLD.id;
+END;
+CREATE TRIGGER IF NOT EXISTS trg_recalls_au AFTER UPDATE ON recalls BEGIN
+    DELETE FROM memory_fts WHERE origin = 'recall:' || OLD.id;
+    INSERT INTO memory_fts(rowid, content, project_id, origin)
+    VALUES (NULL, NEW.text, NEW.project_id, 'recall:' || NEW.id);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_sessions_au_summary AFTER UPDATE OF summary ON sessions
+WHEN NEW.summary IS NOT NULL AND NEW.summary != '' BEGIN
+    DELETE FROM memory_fts WHERE origin = 'session:' || OLD.id;
+    INSERT INTO memory_fts(rowid, content, project_id, origin)
+    VALUES (NULL, NEW.summary, NEW.project_id, 'session:' || NEW.id);
+END;
+CREATE TRIGGER IF NOT EXISTS trg_sessions_ad AFTER DELETE ON sessions BEGIN
+    DELETE FROM memory_fts WHERE origin = 'session:' || OLD.id;
+END;
+"""
+
 
 def connect(db_path: Path) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
