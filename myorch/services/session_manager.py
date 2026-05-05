@@ -1,9 +1,19 @@
 from __future__ import annotations
 
+import os
 import signal
+import uuid
+from dataclasses import dataclass
+from pathlib import Path
+from threading import Lock
 from typing import Sequence
 
 import pexpect
+
+from myorch.config import Settings
+from myorch.digest import generate_digest
+from myorch.models import SessionStatus
+from myorch.services.memory_service import MemoryService
 
 
 class PtySession:
@@ -50,3 +60,83 @@ class PtySession:
                 self._proc.kill(signal.SIGKILL)
             except Exception:
                 pass
+
+
+@dataclass
+class SessionHandle:
+    session_id: int
+    project_id: int
+    pty: PtySession
+
+
+class SessionManager:
+    """Owns the lifecycle of one PTY-backed `claude` process per project."""
+
+    def __init__(
+        self,
+        memory: MemoryService,
+        settings: Settings,
+        claude_argv_factory=None,
+    ):
+        self.memory = memory
+        self.settings = settings
+        self._claude_argv_factory = claude_argv_factory or _default_claude_argv
+        self._handles: dict[int, SessionHandle] = {}
+        self._lock = Lock()
+
+    def open(self, project_id: int) -> SessionHandle:
+        with self._lock:
+            project = self.memory.get_project_by_id(project_id)
+            if project is None:
+                raise ValueError(f"project {project_id} not found")
+            myorch_dir = Path(project.path) / ".myorch"
+            myorch_dir.mkdir(exist_ok=True)
+            digest_path = myorch_dir / "CLAUDE.context.md"
+            digest_path.write_text(generate_digest(self.memory, project_id))
+            session = self.memory.start_session(project_id)
+
+            # Decide claude session UUID: reuse last if exists (--resume),
+            # otherwise generate new (--session-id) per Task 4.0 spike.
+            existing_uuid = project.last_session_id
+            is_resume = existing_uuid is not None
+            claude_uuid = existing_uuid if is_resume else str(uuid.uuid4())
+            self.memory.set_claude_session_id(session.id, claude_uuid)  # type: ignore[arg-type]
+
+            run_dir = self.settings.data_dir / "run"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / f"{project.name}.session").write_text(str(session.id))
+
+            argv = self._claude_argv_factory(
+                project=project, digest_path=digest_path,
+                claude_uuid=claude_uuid, is_resume=is_resume,
+            )
+            env = {**os.environ,
+                   "MYORCH_DB": str(self.settings.db_path),
+                   "MYORCH_PROJECT": project.name}
+            pty = PtySession(argv=argv, cwd=project.path, env=env)
+            pty.spawn()
+            handle = SessionHandle(session_id=session.id, project_id=project_id, pty=pty)  # type: ignore[arg-type]
+            self._handles[session.id] = handle  # type: ignore[index]
+            return handle
+
+    def close(self, session_id: int, status: SessionStatus = SessionStatus.closed) -> None:
+        with self._lock:
+            handle = self._handles.pop(session_id, None)
+        if handle:
+            handle.pty.terminate()
+        self.memory.close_session(session_id, status=status)
+
+    def get(self, session_id: int) -> SessionHandle | None:
+        return self._handles.get(session_id)
+
+
+def _default_claude_argv(project, digest_path: Path, claude_uuid: str,
+                         is_resume: bool) -> list[str]:
+    argv = ["claude"]
+    if is_resume:
+        argv.extend(["--resume", claude_uuid])
+    else:
+        argv.extend(["--session-id", claude_uuid])
+    argv.extend(["--mcp-config", str(Path.home() / ".myorch" / "mcp.json")])
+    argv.extend(["--append-system-prompt", f"@{digest_path}"])
+    return argv
