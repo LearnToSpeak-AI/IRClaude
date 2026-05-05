@@ -1,0 +1,51 @@
+<div class="flex gap-3 h-full">
+  <div class="flex-1 flex flex-col">
+    <div class="text-sm border-b border-zinc-700 pb-2 mb-2">
+      <span class="font-bold">▶ {{ project.name }}</span>
+      <span class="text-zinc-400 ml-2">{{ project.path }}</span>
+      <span class="text-zinc-500 ml-2">{{ project.type }}</span>
+    </div>
+    <div id="terminal" class="flex-1 bg-black"
+         data-project="{{ project.name }}"
+         hx-post="/sessions/open"
+         hx-trigger="load"
+         hx-vals='{"project": "{{ project.name }}"}'
+         hx-swap="none"
+         hx-on::after-request="window.attachTerminal(event.detail.xhr.response)"></div>
+    <div class="mt-2 flex gap-2">
+      <textarea id="msg-input" class="flex-1 bg-zinc-800 px-2 py-1 rounded"
+                rows="2" placeholder="Mensaje (Enter envía, Shift+Enter nueva línea)"></textarea>
+      <button class="px-3 py-1 bg-blue-600 rounded" onclick="window.sendMsg()">Send</button>
+    </div>
+    <div class="mt-3 border-t border-zinc-700 pt-2">
+      <div class="flex items-center gap-2 text-sm">
+        <span class="font-bold">DEV SERVER</span>
+        <button class="px-2 py-0.5 bg-green-700 rounded text-xs"
+                hx-post="/devservers/{{ project.name }}/start" hx-swap="none">▶ Start</button>
+        <button class="px-2 py-0.5 bg-red-700 rounded text-xs"
+                hx-post="/devservers/{{ project.name }}/stop" hx-swap="none">⏹ Stop</button>
+        <span class="text-zinc-500 text-xs">{{ project.dev_command or "(sin comando)" }}</span>
+      </div>
+      <pre id="devserver-tail" class="bg-black h-32 overflow-auto text-xs p-2 mt-1"
+           hx-get="/devservers/{{ project.name }}/tail"
+           hx-trigger="every 2s"
+           hx-swap="innerHTML"></pre>
+    </div>
+  </div>
+  <aside class="w-72 border-l border-zinc-700 pl-3 text-sm overflow-auto">
+    <h3 class="font-bold mb-2">Memoria</h3>
+    <div class="text-xs text-zinc-400 mb-1">Decisiones</div>
+    <div hx-get="/memory/{{ project.name }}/decisions" hx-trigger="load" hx-swap="innerHTML"></div>
+    <div class="text-xs text-zinc-400 mt-3 mb-1">Recalls</div>
+    <div hx-get="/memory/{{ project.name }}/recalls" hx-trigger="load" hx-swap="innerHTML"></div>
+    <div class="mt-4">
+      <input id="mem-search" placeholder="Buscar en memoria..."
+             class="w-full bg-zinc-800 px-2 py-1 rounded text-sm"
+             hx-get="/memory/{{ project.name }}/search"
+             hx-trigger="keyup changed delay:300ms"
+             hx-target="#mem-search-results"
+             name="q">
+      <div id="mem-search-results" class="text-xs mt-1"></div>
+    </div>
+  </aside>
+</div>
