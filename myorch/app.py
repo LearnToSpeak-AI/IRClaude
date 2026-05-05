@@ -19,6 +19,9 @@ def create_app() -> FastAPI:
     settings = get_settings()
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.tmp_dir.mkdir(parents=True, exist_ok=True)
+    from myorch.bootstrap import cleanup_orphan_images, ensure_mcp_config
+    ensure_mcp_config(settings)
+    cleanup_orphan_images(settings)
     conn = connect(settings.db_path)
     init_schema(conn)
     memory = MemoryService(conn)
