@@ -97,10 +97,12 @@ class SessionManager:
             digest_path.write_text(generate_digest(self.memory, project_id))
             session = self.memory.start_session(project_id)
 
-            # Decide claude session UUID: reuse last if exists (--resume),
-            # otherwise generate new (--session-id) per Task 4.0 spike.
+            # Decide claude session UUID: reuse last if its conversation file
+            # still exists (--resume), otherwise generate new (--session-id).
+            # We must check the file because `claude --resume <uuid>` exits
+            # immediately with "No conversation found" if the .jsonl is gone.
             existing_uuid = project.last_session_id
-            is_resume = existing_uuid is not None
+            is_resume = existing_uuid is not None and _claude_conversation_exists(existing_uuid)
             claude_uuid = existing_uuid if is_resume else str(uuid.uuid4())
             self.memory.set_claude_session_id(session.id, claude_uuid)  # type: ignore[arg-type]
 
@@ -171,6 +173,13 @@ class SessionManager:
                 break
             time.sleep(0.1)
         self.close(session_id)
+
+
+def _claude_conversation_exists(claude_uuid: str) -> bool:
+    base = Path.home() / ".claude" / "projects"
+    if not base.exists():
+        return False
+    return any(base.glob(f"*/{claude_uuid}.jsonl"))
 
 
 def _default_claude_argv(project, digest_path: Path, claude_uuid: str,
