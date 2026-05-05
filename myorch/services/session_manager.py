@@ -129,6 +129,31 @@ class SessionManager:
     def get(self, session_id: int) -> SessionHandle | None:
         return self._handles.get(session_id)
 
+    def request_summary_and_close(self, session_id: int, timeout: float = 30.0) -> None:
+        """Send the Stop hook prompt and wait up to `timeout` for save_summary to land."""
+        import time
+        handle = self._handles.get(session_id)
+        if handle is None:
+            self.memory.close_session(session_id)
+            return
+        prompt = (
+            "\n[SISTEMA: la sesión está por cerrar. Llama AHORA a la tool MCP "
+            "`save_summary(summary=..., files_touched=[...])` con un resumen de máximo "
+            "5 líneas de lo trabajado, archivos tocados y decisiones nuevas. "
+            "Después de hacerlo, no escribas nada más.]\n"
+        )
+        try:
+            handle.pty.write(prompt)
+        except Exception:
+            pass
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            s = self.memory.get_session(session_id)
+            if s and s.summary:
+                break
+            time.sleep(0.1)
+        self.close(session_id)
+
 
 def _default_claude_argv(project, digest_path: Path, claude_uuid: str,
                          is_resume: bool) -> list[str]:
