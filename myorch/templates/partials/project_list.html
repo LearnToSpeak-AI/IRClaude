@@ -1,0 +1,12 @@
+<ul class="space-y-1 text-sm">
+  {% for p in projects %}
+  <li class="flex items-center gap-2 px-2 py-1 hover:bg-zinc-700 rounded cursor-pointer"
+      hx-get="/sessions/workspace/{{ p.name }}" hx-target="#workspace">
+    <span class="w-2 h-2 rounded-full bg-zinc-500"></span>
+    <span>{{ p.name }}</span>
+    {% if p.metadata.get("needs_review") %}
+    <span class="ml-auto text-xs text-amber-400">review</span>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
