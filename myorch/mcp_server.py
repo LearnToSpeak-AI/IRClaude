@@ -81,3 +81,47 @@ def build_context() -> McpContext:
     if project is None:
         raise RuntimeError(f"Project {project_name!r} not found in DB")
     return McpContext(memory=memory, project=project)
+
+
+def main() -> None:
+    from mcp.server.fastmcp import FastMCP
+
+    ctx = build_context()
+    mcp = FastMCP("myorch-memory")
+
+    @mcp.tool()
+    def recall(query: str, limit: int = 10) -> list[dict]:
+        """Búsqueda full-text sobre memoria del proyecto activo."""
+        return [h.model_dump() for h in ctx.recall(query, limit=limit)]
+
+    @mcp.tool()
+    def list_recent_sessions(limit: int = 5) -> list[dict]:
+        """Las últimas N sesiones del proyecto activo con su resumen."""
+        return [s.model_dump() for s in ctx.list_recent_sessions(limit=limit)]
+
+    @mcp.tool()
+    def list_decisions(tag: str | None = None) -> list[dict]:
+        """Decisiones del proyecto activo, opcionalmente filtradas por tag."""
+        return [d.model_dump() for d in ctx.list_decisions(tag=tag)]
+
+    @mcp.tool()
+    def save_decision(title: str, body: str, tags: list[str] | None = None) -> int:
+        """Registra una decisión razonada. Devuelve el ID de la decisión."""
+        return ctx.save_decision(title=title, body=body, tags=tags)
+
+    @mcp.tool()
+    def save_recall(text: str, tags: list[str] | None = None) -> int:
+        """Nota rápida ('no olvides X'). Devuelve el ID."""
+        return ctx.save_recall(text=text, tags=tags)
+
+    @mcp.tool()
+    def save_summary(summary: str, files_touched: list[str] | None = None) -> str:
+        """Guarda el resumen de la sesión activa. Llamado por el hook Stop."""
+        ctx.save_summary(summary=summary, files_touched=files_touched)
+        return "ok"
+
+    mcp.run()
+
+
+if __name__ == "__main__":
+    main()
