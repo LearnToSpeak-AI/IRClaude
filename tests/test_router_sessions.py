@@ -37,6 +37,14 @@ def test_open_session_returns_session_id(client: TestClient):
     assert "session_id" in r.json()
 
 
+def test_open_session_accepts_form_encoded(client: TestClient):
+    """HTMX clients send form-encoded; ensure that path also works."""
+    client.post("/projects/scan")
+    r = client.post("/sessions/open", data={"project": "gate"})
+    assert r.status_code == 200
+    assert "session_id" in r.json()
+
+
 def test_websocket_echoes_input_to_pty(client: TestClient):
     client.post("/projects/scan")
     sid = client.post("/sessions/open", json={"project": "gate"}).json()["session_id"]

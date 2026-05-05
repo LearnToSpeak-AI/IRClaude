@@ -30,9 +30,21 @@ async def workspace(name: str, request: Request):
 
 
 @router.post("/open")
-async def open_session(req: OpenSessionRequest, request: Request):
+async def open_session(request: Request):
+    # Accept both JSON body (for API clients) and form data (for HTMX)
+    ct = request.headers.get("content-type", "")
+    if "application/json" in ct:
+        body = await request.json()
+        project_name = body.get("project")
+    else:
+        form = await request.form()
+        project_name = form.get("project")
+
+    if not project_name:
+        return JSONResponse({"error": "missing 'project'"}, status_code=400)
+
     memory = request.app.state.memory
-    project = memory.get_project_by_name(req.project)
+    project = memory.get_project_by_name(project_name)
     if project is None:
         return JSONResponse({"error": "not found"}, status_code=404)
     handle = request.app.state.session_mgr.open(project_id=project.id)
