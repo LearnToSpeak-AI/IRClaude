@@ -1,0 +1,4 @@
+{"type":"agent_start","name":"explore-1","prompt":"find auth files"}
+{"type":"assistant","message":{"content":[{"type":"text","text":"hi from main"}]}}
+{"type":"assistant","subagent":"explore-1","message":{"content":[{"type":"text","text":"found 3 files"}]}}
+{"type":"agent_end","name":"explore-1"}

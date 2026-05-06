@@ -17,7 +17,21 @@ def _privmsg(channel: str, text: str, kind: str, extra: dict[str, str], session_
     return Message(command="PRIVMSG", params=[channel, text], tags=tags)
 
 
-def translate(event: dict[str, Any], channel: str, session_id: str, turn_id: int) -> list[Message]:
+def classify_agent_events(events: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:
+    starts = [e for e in events if e.get("type") == "agent_start"]
+    ends = [e for e in events if e.get("type") == "agent_end"]
+    normal = [e for e in events if e.get("type") not in {"agent_start", "agent_end"}]
+    return starts, ends, normal
+
+
+def translate(
+    event: dict[str, Any],
+    channel: str,
+    session_id: str,
+    turn_id: int,
+    *,
+    agent_nick: str | None = None,
+) -> list[Message]:
     et = event.get("type")
     if et == "assistant":
         msg = event.get("message") or {}
@@ -26,11 +40,16 @@ def translate(event: dict[str, Any], channel: str, session_id: str, turn_id: int
         for item in content:
             it = item.get("type")
             if it == "text":
-                out.append(_privmsg(channel, item.get("text", ""), "text", {}, session_id, turn_id))
+                kind = "agent-msg" if agent_nick else "text"
+                extra = {"+myorch.agent": agent_nick} if agent_nick else {}
+                out.append(_privmsg(channel, item.get("text", ""), kind, extra, session_id, turn_id))
             elif it == "tool_use":
                 tool = item.get("name", "?")
                 summary = f">> {tool}"
-                out.append(_privmsg(channel, summary, "tool-use", {"+myorch.tool": tool}, session_id, turn_id))
+                extra = {"+myorch.tool": tool}
+                if agent_nick:
+                    extra["+myorch.agent"] = agent_nick
+                out.append(_privmsg(channel, summary, "tool-use", extra, session_id, turn_id))
         return out
     if et == "user":
         msg = event.get("message") or {}
