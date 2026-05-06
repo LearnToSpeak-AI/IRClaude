@@ -77,6 +77,9 @@ class IrcClient:
             if msg.command == command:
                 return msg
 
+    async def join(self, channel: str) -> None:
+        await self._send_raw(f"JOIN {channel}")
+
     async def stream(self) -> AsyncIterator[Message]:
         while not self._closed:
             yield await self._inbox.get()
