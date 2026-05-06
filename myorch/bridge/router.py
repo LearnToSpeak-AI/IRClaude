@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Awaitable, Callable, Iterable
 
-from myorch.models import Project
+from myorch.models import Project, SessionStatus
 from myorch.services.memory_service import MemoryService
 
 RunnerFn = Callable[[str, str], Awaitable[None]]
@@ -19,6 +19,11 @@ class SessionContext:
 
 _NON_CHAN = re.compile(r"[^a-z0-9-]")
 _DASH_RUN = re.compile(r"-+")
+
+_SUMMARY_PROMPT_ES = (
+    "Por favor guarda un resumen breve de lo que hicimos en esta sesión "
+    "usando la herramienta save_summary del MCP myorch (en español)."
+)
 
 
 def project_to_channel(name: str) -> str:
@@ -119,3 +124,27 @@ class ChannelRouter:
         q = self._queues.get(channel)
         if q is not None:
             await q.drain()
+
+    def bind_session(self, channel: str, session_id: int) -> None:
+        self._sessions = getattr(self, "_sessions", {})
+        self._sessions[channel] = session_id
+
+    async def idle_close(
+        self,
+        channel: str,
+        *,
+        poll_interval: float = 1.0,
+        max_wait: float = 30.0,
+    ) -> None:
+        sessions = getattr(self, "_sessions", {})
+        session_id = sessions.get(channel)
+        if session_id is None or self._runner is None:
+            return
+        await self._runner(channel, _SUMMARY_PROMPT_ES)
+        deadline = asyncio.get_event_loop().time() + max_wait
+        while asyncio.get_event_loop().time() < deadline:
+            sess = self.memory.get_session(session_id)
+            if sess and sess.summary:
+                break
+            await asyncio.sleep(poll_interval)
+        self.memory.close_session(session_id, SessionStatus.closed)
