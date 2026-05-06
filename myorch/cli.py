@@ -6,6 +6,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from myorch.__about__ import __version__
 from myorch.bridge.ergo_fetch import download_ergo, parse_version_pin
 from myorch.bridge.weechat_link import detect_weechat_plugin_dir, repo_plugin_path
 from myorch.config import load_settings
@@ -214,3 +215,9 @@ def scan() -> None:
 def logs() -> None:
     """Tail bridge log file."""
     console.print("[stub] logs")
+
+
+@app.command()
+def version() -> None:
+    """Print the myorch version."""
+    console.print(__version__)
