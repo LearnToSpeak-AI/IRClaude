@@ -28,6 +28,14 @@ def _parse_tags(raw_tags: str) -> dict[str, str]:
 _BATCHES: dict[str, dict] = {}
 
 
+_STATUS = {
+    "channel": "?",
+    "turn": 0,
+    "agents": set(),
+    "session": "",
+}
+
+
 def _next_code_buffer_name(channel: str) -> str:
     counters = _state.setdefault("code_counters", {})
     n = counters.get(channel, 0) + 1
@@ -71,10 +79,41 @@ def _close_batch(batch_id: str) -> None:
         weechat.prnt(info["channel"], marker)
 
 
+def cb_bar_status(data, item, window):
+    return (
+        f"proj={_STATUS['channel']}|"
+        f"turn={_STATUS['turn']}|"
+        f"agents={len(_STATUS['agents'])}"
+    )
+
+
+def cb_signal_join(data, signal, signal_data):
+    parts = signal_data.split()
+    if not parts:
+        return weechat.WEECHAT_RC_OK()
+    prefix = parts[0]
+    if prefix.startswith(":"):
+        nick = prefix[1:].split("!", 1)[0]
+        if not nick.startswith("claude"):
+            _STATUS["agents"].add(nick)
+    return weechat.WEECHAT_RC_OK()
+
+
 def cb_modifier_privmsg(data, modifier, modifier_data, line):
     parsed = weechat.info_get_hashtable("irc_message_parse", {"message": line})
     tags = _parse_tags(parsed.get("tags", ""))
     cmd = parsed.get("command", "")
+
+    chan = parsed.get("channel") or _STATUS["channel"]
+    if chan and chan.startswith("#"):
+        _STATUS["channel"] = chan
+    if "+myorch.turn-id" in tags:
+        try:
+            _STATUS["turn"] = int(tags["+myorch.turn-id"])
+        except ValueError:
+            pass
+    if "+myorch.session-id" in tags:
+        _STATUS["session"] = tags["+myorch.session-id"]
 
     if cmd == "BATCH":
         body = line.split()
@@ -113,3 +152,5 @@ weechat.register(
     "",
 )
 weechat.hook_modifier("irc_in2_privmsg", cb_modifier_privmsg, "")
+weechat.bar_item_new("myorch_status", cb_bar_status, "")
+weechat.hook_signal("*,irc_in2_join", cb_signal_join, "")
