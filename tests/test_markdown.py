@@ -26,11 +26,48 @@ def test_list_item_replaces_dash_with_bullet():
     assert markdown_to_irc("- one\n- two") == "· one\n· two"
 
 
-def test_link_renders_text_then_url_in_parens():
+def test_link_renders_text_underlined_then_url_in_parens():
     assert (
         markdown_to_irc("see [docs](https://example.com)")
-        == "see docs (https://example.com)"
+        == "see \x1Fdocs\x1F (https://example.com)"
     )
+
+
+def test_strikethrough_uses_irc_strikethrough_marker():
+    assert markdown_to_irc("a ~~old~~ b") == "a \x1Eold\x1E b"
+
+
+def test_blockquote_prefixes_with_colored_bar():
+    out = markdown_to_irc("> remember to lock the door")
+    assert out == "\x0314▌\x0F remember to lock the door"
+
+
+def test_checklist_done_becomes_check_mark():
+    out = markdown_to_irc("- [x] ship it")
+    assert out.startswith("\x0303☑\x0F ")
+    assert "ship it" in out
+
+
+def test_checklist_todo_becomes_empty_box():
+    out = markdown_to_irc("- [ ] write tests")
+    assert out == "☐ write tests"
+
+
+def test_table_renders_as_ascii_grid():
+    md = (
+        "| Value | Code |\n"
+        "|-------|------|\n"
+        "| READ  | 0    |\n"
+        "| WRITE | 1    |\n"
+    )
+    out = markdown_to_irc(md)
+    # tabulate's rounded_grid uses unicode box chars; check structure + values.
+    assert "Value" in out
+    assert "Code" in out
+    assert "READ" in out
+    assert "WRITE" in out
+    # No raw markdown pipe-rows survive.
+    assert "|-------|" not in out
 
 
 def test_round_trip_paragraph_unchanged_when_no_markup():
