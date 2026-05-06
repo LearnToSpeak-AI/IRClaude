@@ -98,13 +98,13 @@ def cb_bar_status(data, item, window):
 def cb_signal_join(data, signal, signal_data):
     parts = signal_data.split()
     if not parts:
-        return weechat.WEECHAT_RC_OK()
+        return weechat.WEECHAT_RC_OK
     prefix = parts[0]
     if prefix.startswith(":"):
         nick = prefix[1:].split("!", 1)[0]
         if not nick.startswith("claude"):
             _STATUS["agents"].add(nick)
-    return weechat.WEECHAT_RC_OK()
+    return weechat.WEECHAT_RC_OK
 
 
 def cb_modifier_privmsg(data, modifier, modifier_data, line):
@@ -155,16 +155,16 @@ def cb_command_irclaude(data, buffer, args):
     parts = args.split()
     if not parts:
         weechat.prnt(buffer, "/irclaude projects|recall|search|decisions|close|agents")
-        return weechat.WEECHAT_RC_OK()
+        return weechat.WEECHAT_RC_OK
     sub = parts[0]
     rest = " ".join(parts[1:])
     payload = f"!{sub}" + (f" {rest}" if rest else "")
     weechat.prnt(buffer, f"PRIVMSG claude :{payload}")
-    return weechat.WEECHAT_RC_OK()
+    return weechat.WEECHAT_RC_OK
 
 
 def shutdown_cb():
-    return weechat.WEECHAT_RC_OK()
+    return weechat.WEECHAT_RC_OK
 
 
 weechat.register(

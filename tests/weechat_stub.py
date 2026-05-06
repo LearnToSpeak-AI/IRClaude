@@ -132,5 +132,4 @@ def color(_name):
     return ""
 
 
-def WEECHAT_RC_OK():
-    return 0
+WEECHAT_RC_OK = 0
