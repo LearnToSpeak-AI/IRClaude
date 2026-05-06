@@ -117,24 +117,29 @@ def cb_modifier_privmsg(data, modifier, modifier_data, line):
 
     if cmd == "BATCH":
         body = line.split()
-        if len(body) >= 3 and body[-3].startswith("+"):
-            batch_id = body[-3][1:]
-            batch_type = body[-2]
-            channel = body[-1]
+        try:
+            bidx = body.index("BATCH")
+        except ValueError:
+            return line
+        args = body[bidx + 1:]
+        if args and args[0].startswith("+") and len(args) >= 3:
+            batch_id = args[0][1:]
+            batch_type = args[1]
+            channel = args[2]
             _begin_batch(batch_id, batch_type, channel, tags)
-        elif body and body[-1].startswith("-"):
-            _close_batch(body[-1][1:])
+        elif args and args[0].startswith("-"):
+            _close_batch(args[0][1:])
         return line
 
     if cmd == "PRIVMSG" and tags.get("batch"):
         batch_id = tags["batch"]
-        text = parsed.get("arguments", "")
-        _append_batch_line(batch_id, text)
-        return ""
-
-    kind = tags.get("+myorch.kind") or tags.get("myorch.kind")
-    if not kind:
+        info = _BATCHES.get(batch_id)
+        if info and info["tags"].get("+myorch.codeblock"):
+            text = parsed.get("arguments", "")
+            _append_batch_line(batch_id, text)
+            return ""
         return line
+
     return line
 
 
@@ -164,6 +169,7 @@ weechat.register(
     "",
 )
 weechat.hook_modifier("irc_in2_privmsg", "cb_modifier_privmsg", "")
+weechat.hook_modifier("irc_in2_batch", "cb_modifier_privmsg", "")
 weechat.bar_item_new("myorch_status", "cb_bar_status", "")
 weechat.hook_signal("*,irc_in2_join", "cb_signal_join", "")
 weechat.hook_command(
