@@ -7,7 +7,9 @@ from rich.console import Console
 from rich.table import Table
 
 from myorch.__about__ import __version__
+from myorch.bridge.ergo_config import generate_ergo_config
 from myorch.bridge.ergo_fetch import download_ergo, parse_version_pin
+from myorch.bridge.server import ErgoServer
 from myorch.bridge.weechat_link import detect_weechat_plugin_dir, repo_plugin_path
 from myorch.config import load_settings
 from myorch.db import connect, init_schema
@@ -26,18 +28,64 @@ def _pid_alive(pid: int) -> bool:
         return False
 
 
-def _launch_bridge_blocking(settings) -> None:
+async def _wait_for_port(host: str, port: int, deadline_s: float = 5.0) -> bool:
+    import asyncio
+
+    loop = asyncio.get_event_loop()
+    end = loop.time() + deadline_s
+    while loop.time() < end:
+        try:
+            r, w = await asyncio.open_connection(host, port)
+            w.close()
+            await w.wait_closed()
+            return True
+        except OSError:
+            await asyncio.sleep(0.1)
+    return False
+
+
+async def _run_ergo_and_bridge(settings) -> None:
     import asyncio
 
     from myorch.bridge import Bridge
-    from myorch.db import connect, init_schema
-    from myorch.services.memory_service import MemoryService
 
+    if not settings.ergo_config.exists():
+        raise RuntimeError(
+            f"ergo config not found at {settings.ergo_config} — run `myorch setup` first"
+        )
+    if not settings.ergo_binary.exists():
+        raise RuntimeError(
+            f"ergo binary not found at {settings.ergo_binary} — run `myorch setup` first"
+        )
+
+    server = ErgoServer(
+        binary_path=settings.ergo_binary,
+        config_path=settings.ergo_config,
+    )
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     conn = connect(settings.db_path); init_schema(conn)
     mem = MemoryService(conn)
     bridge = Bridge(settings=settings, memory=mem)
-    asyncio.run(bridge.run_with_signals())
+
+    console.print(f"[cyan]starting ergo[/cyan] at {settings.host}:{settings.port}")
+    await server.start()
+    if not await _wait_for_port(settings.host, settings.port, deadline_s=5.0):
+        await server.stop()
+        raise RuntimeError(
+            f"ergo did not accept connections on {settings.host}:{settings.port} within 5s"
+        )
+    console.print("[green]ergo ready[/green] — starting bridge")
+    try:
+        await bridge.run_with_signals()
+    finally:
+        console.print("[cyan]stopping ergo[/cyan]")
+        await server.stop()
+
+
+def _launch_bridge_blocking(settings) -> None:
+    import asyncio
+
+    asyncio.run(_run_ergo_and_bridge(settings))
 
 
 def _write_default_config(path: Path, apps_root: Path, port: int) -> None:
@@ -139,6 +187,13 @@ def setup() -> None:
         chosen = _prompt_for_apps_root(settings.apps_root)
         if chosen != settings.apps_root:
             settings = settings.model_copy(update={"apps_root": chosen})
+
+    settings.etc_dir.mkdir(parents=True, exist_ok=True)
+    settings.ergo_config.write_text(
+        generate_ergo_config(host=settings.host, port=settings.port),
+        encoding="utf-8",
+    )
+    console.print(f"Wrote ergo config to {settings.ergo_config}")
 
     _write_default_config(
         settings.config_file, apps_root=settings.apps_root, port=settings.port
