@@ -27,10 +27,11 @@ def ensure_mcp_config(settings: Settings) -> None:
 
 
 def cleanup_orphan_images(settings: Settings, max_age_seconds: int = 24 * 3600) -> None:
-    if not settings.tmp_dir.exists():
+    tmp_dir = settings.run_dir / "tmp"
+    if not tmp_dir.exists():
         return
     cutoff = time.time() - max_age_seconds
-    for p in settings.tmp_dir.glob("*"):
+    for p in tmp_dir.glob("*"):
         try:
             if p.stat().st_mtime < cutoff:
                 if p.is_dir():
