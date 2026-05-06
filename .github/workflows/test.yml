@@ -45,7 +45,7 @@ jobs:
           curl -fsSL "https://github.com/ergochat/ergo/releases/download/v${ERGO_VERSION}/ergo-${ERGO_VERSION}-linux-x86_64.tar.gz" -o /tmp/ergo.tgz
           echo "${ERGO_SHA}  /tmp/ergo.tgz" | sha256sum -c -
           tar -xzf /tmp/ergo.tgz -C /tmp
-          install -m 0755 "/tmp/ergo-${ERGO_VERSION}/ergo" ~/.local/bin/ergo
+          install -m 0755 "/tmp/ergo-${ERGO_VERSION}-linux-x86_64/ergo" ~/.local/bin/ergo
 
       - name: Add ergo to PATH
         run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
