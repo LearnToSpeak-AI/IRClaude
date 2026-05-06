@@ -170,7 +170,7 @@ def up() -> None:
         log_file = settings.run_dir / "bridge.log"
         with open(log_file, "ab") as fh:
             proc = subprocess.Popen(
-                [sys.executable, "-m", "irclaude.cli", "start"],
+                [sys.executable, "-m", "irclaude", "start"],
                 stdout=fh,
                 stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL,

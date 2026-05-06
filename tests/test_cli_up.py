@@ -39,6 +39,55 @@ def test_up_errors_when_weechat_missing(tmp_path: Path, monkeypatch):
     assert "weechat not on PATH" in result.stdout
 
 
+def test_up_spawns_python_dash_m_irclaude_not_irclaude_cli(tmp_path: Path, monkeypatch):
+    """Regression: python -m irclaude.cli silently exits 0 because cli.py has no
+    __main__ block. The runnable module is irclaude (via __main__.py)."""
+    home = tmp_path / "home"; home.mkdir()
+    data = home / ".local" / "share" / "irclaude"
+    bin_dir = data / "bin"
+    bin_dir.mkdir(parents=True)
+    (bin_dir / "ergo").write_text("#!/bin/sh\nexit 0\n")
+    (bin_dir / "ergo").chmod(0o755)
+
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setattr("irclaude.cli.shutil.which", lambda name: "/usr/bin/weechat")
+
+    captured: list = []
+
+    class FakePopen:
+        def __init__(self, args, **kw):
+            captured.append(args)
+            self.pid = 99999
+
+    monkeypatch.setattr("irclaude.cli.subprocess.Popen", FakePopen)
+
+    class FakeSocket:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def fake_create_connection(addr, timeout):
+        return FakeSocket()
+
+    monkeypatch.setattr("irclaude.cli.socket.create_connection", fake_create_connection)
+
+    class FakeProc:
+        returncode = 0
+
+    monkeypatch.setattr("irclaude.cli.subprocess.run", lambda *a, **kw: FakeProc())
+    monkeypatch.setattr("irclaude.cli.typer.prompt", lambda *a, **kw: "n")
+
+    result = runner.invoke(app, ["up"])
+    assert result.exit_code == 0, result.stdout
+    assert captured, "expected Popen to be called"
+    argv = captured[0]
+    assert argv[1:3] == ["-m", "irclaude"], (
+        f"spawn argv must be `python -m irclaude start`, got {argv!r}"
+    )
+    assert argv[-1] == "start"
+
+
 def test_up_skips_spawn_when_bridge_already_running(tmp_path: Path, monkeypatch):
     home = tmp_path / "home"; home.mkdir()
     data = home / ".local" / "share" / "irclaude"
