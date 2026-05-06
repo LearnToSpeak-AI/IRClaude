@@ -51,10 +51,10 @@ class ClaudeRunner:
             "--output-format",
             "stream-json",
             "--verbose",
-            "--append-system-prompt",
-            f"@{self.digest_path}",
             "--mcp-config",
             str(self.mcp_config_path),
+            "--append-system-prompt-file",
+            str(self.digest_path),
             prompt,
         ]
 
