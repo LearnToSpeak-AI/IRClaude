@@ -1,5 +1,10 @@
 import os
+import shutil
 import signal as _signal
+import socket
+import subprocess
+import sys
+import time
 from pathlib import Path
 
 import typer
@@ -131,6 +136,85 @@ def stop() -> None:
     os.kill(pid, _signal.SIGTERM)
     settings.pid_file.unlink()
     console.print(f"sent SIGTERM to {pid}")
+
+
+@app.command()
+def up() -> None:
+    """Boot ergo + bridge in the background and open WeeChat in the same terminal."""
+    settings = load_settings()
+
+    if not settings.ergo_binary.exists():
+        console.print(
+            "[red]ergo binary not found[/red] — run "
+            "[cyan]irclaude setup[/cyan] first."
+        )
+        raise typer.Exit(code=1)
+    if shutil.which("weechat") is None:
+        console.print(
+            "[red]weechat not on PATH[/red] — install it "
+            "(e.g. [cyan]sudo apt install weechat[/cyan])."
+        )
+        raise typer.Exit(code=1)
+
+    bridge_was_running = (
+        settings.pid_file.exists()
+        and _pid_alive(int(settings.pid_file.read_text(encoding="utf-8").strip()))
+    )
+    if bridge_was_running:
+        pid = settings.pid_file.read_text(encoding="utf-8").strip()
+        console.print(f"[green]✓[/green] bridge already running (pid={pid})")
+    else:
+        if settings.pid_file.exists():
+            settings.pid_file.unlink()
+        settings.run_dir.mkdir(parents=True, exist_ok=True)
+        log_file = settings.run_dir / "bridge.log"
+        with open(log_file, "ab") as fh:
+            proc = subprocess.Popen(
+                [sys.executable, "-m", "irclaude.cli", "start"],
+                stdout=fh,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        deadline = time.monotonic() + 10.0
+        ready = False
+        while time.monotonic() < deadline:
+            try:
+                with socket.create_connection(
+                    (settings.host, settings.port), timeout=0.25
+                ):
+                    ready = True
+                    break
+            except OSError:
+                time.sleep(0.2)
+        if not ready:
+            try:
+                os.kill(proc.pid, _signal.SIGTERM)
+            except OSError:
+                pass
+            console.print(
+                f"[red]ergo did not become ready in 10s[/red] — see {log_file}"
+            )
+            raise typer.Exit(code=1)
+        console.print(f"[green]✓[/green] bridge started (logs: {log_file})")
+
+    console.print("[cyan]Launching WeeChat...[/cyan]")
+    rc = subprocess.run(["weechat"]).returncode
+    console.print(f"[cyan]WeeChat exited (code={rc}).[/cyan]")
+
+    if not bridge_was_running and settings.pid_file.exists():
+        confirm = typer.prompt("Stop ergo + bridge too? [Y/n]", default="y")
+        if confirm.lower().startswith("y"):
+            try:
+                pid = int(settings.pid_file.read_text(encoding="utf-8").strip())
+                os.kill(pid, _signal.SIGTERM)
+                console.print(f"[green]✓[/green] sent SIGTERM to {pid}")
+            except (OSError, ValueError):
+                pass
+            try:
+                settings.pid_file.unlink()
+            except OSError:
+                pass
 
 
 @app.command()
@@ -333,14 +417,18 @@ def _configure_weechat_server(settings) -> bool:
 def _print_next_steps(settings, *, weechat_configured: bool) -> None:
     console.print()
     console.print("[bold]Next steps[/bold]")
-    console.print(f"  1. Run [cyan]irclaude start[/cyan] to launch ergo + bridge")
     if weechat_configured:
         console.print(
-            f"  2. In another terminal, run [cyan]weechat[/cyan] — "
-            "the plugin autoloads and the server autoconnects"
+            f"  1. Run [cyan]irclaude up[/cyan] — boots ergo + bridge in the "
+            "background and opens WeeChat (autoloads plugin, autoconnects)."
         )
-        console.print(f"  3. In WeeChat, run [cyan]/join #yourproject[/cyan]")
+        console.print(f"  2. In WeeChat, run [cyan]/join #yourproject[/cyan]")
+        console.print(
+            "  (Or use [cyan]irclaude start[/cyan] in one terminal + "
+            "[cyan]weechat[/cyan] in another if you prefer separate logs.)"
+        )
     else:
+        console.print(f"  1. Run [cyan]irclaude start[/cyan] to launch ergo + bridge")
         console.print(f"  2. In another terminal, run [cyan]weechat[/cyan]")
         console.print(
             f"  3. In WeeChat, run "

@@ -53,17 +53,30 @@ and `irclaude setup-weechat` re-runs just the WeeChat steps.
 
 ## Daily use
 
+The fast path is `irclaude up` — it boots ergo + bridge in the background
+and opens WeeChat in the same terminal. The plugin autoloads, the server
+autoconnects, you just `/join`:
+
+```sh
+irclaude up                # one terminal: backgrounded bridge + foreground WeeChat
+# /join #yourproject
+# type a message — Claude responds in the channel
+# /quit when done
+```
+
+When you `/quit` WeeChat, `irclaude up` asks whether to stop the bridge too.
+
+If you prefer split terminals (e.g. to watch bridge logs live):
+
 ```sh
 irclaude start             # foreground: ergo + bridge, Ctrl+C to stop
 # in another terminal:
-weechat                    # auto-connects (if you said yes during setup)
-# /python load irclaude.py
+weechat                    # auto-loads plugin, auto-connects to irclaude
 # /join #yourproject
-# type a message — Claude responds in the channel
 ```
 
-To stop a backgrounded run, `irclaude stop` reads the PID file and sends
-SIGTERM.
+To stop a backgrounded run started elsewhere, `irclaude stop` reads the PID
+file and sends SIGTERM.
 
 ## Authentication: subscription vs API key
 
@@ -103,6 +116,7 @@ port = 6667
 | Command                 | What it does                                          |
 |-------------------------|-------------------------------------------------------|
 | `irclaude setup`        | First-run wizard (ergo, projects, WeeChat)            |
+| `irclaude up`           | Background bridge + foreground WeeChat (one terminal) |
 | `irclaude doctor`       | Re-run prerequisite checks                            |
 | `irclaude start`        | Foreground ergo + bridge                              |
 | `irclaude stop`         | SIGTERM the running bridge                            |
