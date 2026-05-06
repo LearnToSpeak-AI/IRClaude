@@ -1,0 +1,57 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Read ergo version pin
+        id: ergo
+        run: |
+          version=$(grep '^version=' bin/.ergo-version | cut -d= -f2)
+          sha=$(grep '^sha256=' bin/.ergo-version | cut -d= -f2)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Cache ergo binary
+        id: ergo-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/ergo
+          key: ergo-${{ steps.ergo.outputs.version }}-${{ steps.ergo.outputs.sha }}
+
+      - name: Download ergo
+        if: steps.ergo-cache.outputs.cache-hit != 'true'
+        env:
+          ERGO_VERSION: ${{ steps.ergo.outputs.version }}
+          ERGO_SHA: ${{ steps.ergo.outputs.sha }}
+        run: |
+          mkdir -p ~/.local/bin
+          curl -fsSL "https://github.com/ergochat/ergo/releases/download/v${ERGO_VERSION}/ergo-${ERGO_VERSION}-linux-x86_64.tar.gz" -o /tmp/ergo.tgz
+          echo "${ERGO_SHA}  /tmp/ergo.tgz" | sha256sum -c -
+          tar -xzf /tmp/ergo.tgz -C /tmp
+          install -m 0755 "/tmp/ergo-${ERGO_VERSION}/ergo" ~/.local/bin/ergo
+
+      - name: Add ergo to PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Test
+        run: pytest -q
