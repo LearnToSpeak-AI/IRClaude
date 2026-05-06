@@ -1,10 +1,37 @@
 import re
 
+from pygments import highlight
+from pygments.formatters import IRCFormatter
+from pygments.lexers import get_lexer_by_name
+from pygments.util import ClassNotFound
+
 from irclaude.bridge.markdown import markdown_to_irc
 from irclaude.irc.protocol import encode_batch, encode_multiline, new_batch_id
 
 
 _FENCE = re.compile(r"^```(\S*)\s*$")
+_BORDER_COLOR = "\x0314"  # light grey
+_RESET = "\x0F"
+
+
+def _highlight_code_lines(lang: str, lines: list[str]) -> list[str]:
+    """Apply Pygments IRC-color highlighting to code lines.
+
+    Falls back to the raw lines if the language is unknown or Pygments errors out.
+    """
+    text = "\n".join(lines)
+    try:
+        lexer = get_lexer_by_name(lang, stripnl=False)
+    except ClassNotFound:
+        return list(lines)
+    try:
+        formatted = highlight(text, lexer, IRCFormatter())
+    except Exception:
+        return list(lines)
+    out = formatted.split("\n")
+    if out and out[-1] == "":
+        out.pop()
+    return out
 
 
 class CodeBlockBuffer:
@@ -44,13 +71,18 @@ class CodeBlockBuffer:
             return []
         tags = self._common_tags()
         tags["+irclaude.kind"] = "code"
-        tags["+irclaude.codeblock"] = lang
+        tags["+irclaude.lang"] = lang
+        body = [
+            f"{_BORDER_COLOR}─── {lang} ───{_RESET}",
+            *_highlight_code_lines(lang, lines),
+            f"{_BORDER_COLOR}───{_RESET}",
+        ]
         return encode_batch(
             batch_id=new_batch_id(),
             type_="draft/multiline",
             tags=tags,
             target=self.channel,
-            contents=lines,
+            contents=body,
         )
 
     def feed(self, chunk: str) -> list[str]:

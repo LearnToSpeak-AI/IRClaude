@@ -1,5 +1,14 @@
+import re
+
 from irclaude.bridge.codeblock import CodeBlockBuffer
 from irclaude.irc.messages import parse_line
+
+
+_IRC_COLOR = re.compile(r"\x03\d{0,2}(?:,\d{0,2})?|\x0F|\x02|\x1D|\x11|\x1F|\x1E|\x16")
+
+
+def _strip_irc_codes(s: str) -> str:
+    return _IRC_COLOR.sub("", s)
 
 
 def test_plain_text_passes_through():
@@ -23,20 +32,28 @@ def test_multiline_text_uses_multiline_batch():
     assert bodies == ["first paragraph", "second paragraph"]
 
 
-def test_python_fenced_block_emits_codeblock_batch():
+def test_python_fenced_block_emits_inline_with_lang_tag_and_borders():
     buf = CodeBlockBuffer(channel="#p", session_id="s", turn_id=1)
     text = "intro\n```python\ndef foo():\n    return 42\n```\noutro"
     out = buf.feed(text)
     out += buf.flush()
     parsed = [parse_line(l) for l in out]
     open_batches = [p for p in parsed if p.command == "BATCH" and p.params[0].startswith("+")]
-    assert any(p.tags.get("+irclaude.codeblock") == "python" for p in open_batches)
+    code_open = [p for p in open_batches if p.tags.get("+irclaude.kind") == "code"]
+    assert code_open, "expected a code-kind BATCH open"
+    assert code_open[0].tags.get("+irclaude.lang") == "python"
+    # +irclaude.codeblock is gone — code blocks are inline now, no separate buffer.
+    assert "+irclaude.codeblock" not in code_open[0].tags
     code_lines = [
-        p.params[1]
+        _strip_irc_codes(p.params[1])
         for p in parsed
         if p.command == "PRIVMSG" and p.tags.get("batch")
     ]
-    assert code_lines == ["def foo():", "    return 42"]
+    # Top + bottom border + code lines (Pygments adds IRC color codes between
+    # tokens; assertions strip them so we can grep substrings directly).
+    assert any("─── python ───" in l for l in code_lines)
+    assert any("def foo():" in l for l in code_lines)
+    assert any("return 42" in l for l in code_lines)
     text_lines = [
         p.params[1]
         for p in parsed
@@ -53,7 +70,13 @@ def test_unlanguaged_fence_uses_text_lang():
     out = buf.feed("```\nA\nB\n```")
     out += buf.flush()
     parsed = [parse_line(l) for l in out]
-    assert any(p.tags.get("+irclaude.codeblock") == "text" for p in parsed if p.command == "BATCH")
+    code_open = [
+        p for p in parsed
+        if p.command == "BATCH" and p.params[0].startswith("+")
+        and p.tags.get("+irclaude.kind") == "code"
+    ]
+    assert code_open
+    assert code_open[0].tags.get("+irclaude.lang") == "text"
 
 
 def test_unterminated_fence_at_eof_still_flushes():
@@ -61,8 +84,13 @@ def test_unterminated_fence_at_eof_still_flushes():
     out = buf.feed("```python\nincomplete")
     out += buf.flush()
     parsed = [parse_line(l) for l in out]
-    code_lines = [p.params[1] for p in parsed if p.command == "PRIVMSG" and p.tags.get("batch")]
-    assert code_lines == ["incomplete"]
+    code_lines = [
+        _strip_irc_codes(p.params[1])
+        for p in parsed
+        if p.command == "PRIVMSG" and p.tags.get("batch")
+    ]
+    # Borders + 'incomplete' line.
+    assert any("incomplete" in l for l in code_lines)
 
 
 def test_bold_markdown_becomes_irc_bold_in_text():
@@ -82,10 +110,13 @@ def test_bold_inside_code_block_stays_literal():
     out += buf.flush()
     parsed = [parse_line(l) for l in out]
     code_text = " ".join(
-        p.params[1] for p in parsed if p.command == "PRIVMSG" and p.tags.get("batch")
+        _strip_irc_codes(p.params[1])
+        for p in parsed
+        if p.command == "PRIVMSG" and p.tags.get("batch")
     )
+    # Code is run through Pygments (IRC color codes), but the literal asterisks
+    # of the string content survive — markdown_to_irc never gets to apply bold.
     assert "**not bold**" in code_text
-    assert "\x02" not in code_text
 
 
 def test_list_marker_becomes_bullet():
