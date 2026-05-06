@@ -40,7 +40,7 @@ async def _wait_for_port(host: str, port: int, deadline_s: float) -> bool:
 @pytest.mark.asyncio
 async def test_ergo_server_starts_and_accepts_tcp(tmp_path, free_port):
     cfg_path = tmp_path / "ergo.yaml"
-    cfg_path.write_text(generate_ergo_config("127.0.0.1", free_port), encoding="utf-8")
+    cfg_path.write_text(generate_ergo_config("127.0.0.1", free_port, binary_path=Path(shutil.which("ergo"))), encoding="utf-8")
     server = ErgoServer(binary_path=_ergo_binary(), config_path=cfg_path)
 
     await server.start()
@@ -55,7 +55,7 @@ async def test_ergo_server_starts_and_accepts_tcp(tmp_path, free_port):
 @pytest.mark.asyncio
 async def test_ergo_server_stop_is_graceful_then_kill(tmp_path, free_port):
     cfg_path = tmp_path / "ergo.yaml"
-    cfg_path.write_text(generate_ergo_config("127.0.0.1", free_port), encoding="utf-8")
+    cfg_path.write_text(generate_ergo_config("127.0.0.1", free_port, binary_path=Path(shutil.which("ergo"))), encoding="utf-8")
     server = ErgoServer(binary_path=_ergo_binary(), config_path=cfg_path, kill_after=0.2)
     await server.start()
     pid = server.pid
@@ -67,7 +67,7 @@ async def test_ergo_server_stop_is_graceful_then_kill(tmp_path, free_port):
 @pytest.mark.asyncio
 async def test_ergo_server_double_start_raises(tmp_path, free_port):
     cfg_path = tmp_path / "ergo.yaml"
-    cfg_path.write_text(generate_ergo_config("127.0.0.1", free_port), encoding="utf-8")
+    cfg_path.write_text(generate_ergo_config("127.0.0.1", free_port, binary_path=Path(shutil.which("ergo"))), encoding="utf-8")
     server = ErgoServer(binary_path=_ergo_binary(), config_path=cfg_path)
     await server.start()
     try:

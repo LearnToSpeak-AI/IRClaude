@@ -18,7 +18,7 @@ pytestmark = pytest.mark.skipif(
 @pytest.fixture
 async def running_ergo(tmp_path: Path, free_port: int):
     cfg = tmp_path / "ergo.yaml"
-    cfg.write_text(generate_ergo_config("127.0.0.1", free_port), encoding="utf-8")
+    cfg.write_text(generate_ergo_config("127.0.0.1", free_port, binary_path=Path(shutil.which("ergo"))), encoding="utf-8")
     server = ErgoServer(binary_path=Path(shutil.which("ergo")), config_path=cfg)
     await server.start()
     for _ in range(40):

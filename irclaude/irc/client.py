@@ -15,6 +15,11 @@ _REQUESTED_CAPS = (
 )
 
 
+def _strip_cap_values(tokens) -> list[str]:
+    """CAP LS 302 advertises caps as 'name' or 'name=value'. Strip the value."""
+    return [t.split("=", 1)[0] for t in tokens]
+
+
 class IrcClient:
     def __init__(self, host: str, port: int, nick: str, *, user: str | None = None,
                  realname: str | None = None) -> None:
@@ -48,7 +53,7 @@ class IrcClient:
             msg = await self._inbox.get()
             if msg.command == "CAP" and msg.params[1] == "LS":
                 trailing = msg.params[-1]
-                offered.update(trailing.split())
+                offered.update(_strip_cap_values(trailing.split()))
                 if msg.params[1] == "LS" and len(msg.params) >= 4 and msg.params[2] == "*":
                     continue
                 break
@@ -57,7 +62,7 @@ class IrcClient:
             await self._send_raw("CAP REQ :" + " ".join(wanted))
             ack = await self._inbox.get()
             if ack.command == "CAP" and ack.params[1] == "ACK":
-                self.acked_caps = set(ack.params[-1].split())
+                self.acked_caps = set(_strip_cap_values(ack.params[-1].split()))
         await self._send_raw("CAP END")
 
     async def _send_raw(self, line: str) -> None:
