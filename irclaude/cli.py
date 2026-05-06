@@ -335,15 +335,22 @@ def _print_next_steps(settings, *, weechat_configured: bool) -> None:
     console.print("[bold]Next steps[/bold]")
     console.print(f"  1. Run [cyan]irclaude start[/cyan] to launch ergo + bridge")
     if weechat_configured:
-        console.print(f"  2. In another terminal, run [cyan]weechat[/cyan] (auto-connects to irclaude)")
-        console.print(f"  3. In WeeChat, run [cyan]/python load irclaude.py[/cyan] then [cyan]/join #yourproject[/cyan]")
+        console.print(
+            f"  2. In another terminal, run [cyan]weechat[/cyan] — "
+            "the plugin autoloads and the server autoconnects"
+        )
+        console.print(f"  3. In WeeChat, run [cyan]/join #yourproject[/cyan]")
     else:
         console.print(f"  2. In another terminal, run [cyan]weechat[/cyan]")
         console.print(
             f"  3. In WeeChat, run "
             f"[cyan]/server add irclaude {settings.host}/{settings.port} -notls -autoconnect[/cyan]"
+            f" then [cyan]/connect irclaude[/cyan]"
         )
-        console.print(f"     then [cyan]/connect irclaude[/cyan] and [cyan]/python load irclaude.py[/cyan]")
+        console.print(
+            "     (the plugin already autoloads from "
+            "[cyan]~/.local/share/weechat/python/autoload/[/cyan])"
+        )
 
 
 @app.command(name="setup-weechat")
