@@ -25,13 +25,76 @@ def _parse_tags(raw_tags: str) -> dict[str, str]:
     return out
 
 
+_BATCHES: dict[str, dict] = {}
+
+
+def _next_code_buffer_name(channel: str) -> str:
+    counters = _state.setdefault("code_counters", {})
+    n = counters.get(channel, 0) + 1
+    counters[channel] = n
+    return f"code:{channel}:{n}"
+
+
+def _highlight_to_irc(language: str, text: str) -> str:
+    return text
+
+
+def _begin_batch(batch_id: str, batch_type: str, channel: str, tags: dict) -> None:
+    _BATCHES[batch_id] = {
+        "channel": channel,
+        "type": batch_type,
+        "tags": tags,
+        "lines": [],
+    }
+
+
+def _append_batch_line(batch_id: str, line: str) -> None:
+    info = _BATCHES.get(batch_id)
+    if info is None:
+        return
+    info["lines"].append(line)
+
+
+def _close_batch(batch_id: str) -> None:
+    info = _BATCHES.pop(batch_id, None)
+    if info is None:
+        return
+    if info["tags"].get("+myorch.codeblock"):
+        lang = info["tags"]["+myorch.codeblock"]
+        buf_name = _next_code_buffer_name(info["channel"])
+        weechat.buffer_new(buf_name, "", "", "", "")
+        weechat.buffer_set(buf_name, "type", "free")
+        weechat.buffer_set(buf_name, "title", f"{info['channel']} code [{lang}]")
+        for idx, line in enumerate(info["lines"], start=1):
+            weechat.prnt_y(buf_name, idx, _highlight_to_irc(lang, line))
+        marker = f"[code ({lang}, {len(info['lines'])} lines) -> /buffer {buf_name}]"
+        weechat.prnt(info["channel"], marker)
+
+
 def cb_modifier_privmsg(data, modifier, modifier_data, line):
     parsed = weechat.info_get_hashtable("irc_message_parse", {"message": line})
     tags = _parse_tags(parsed.get("tags", ""))
+    cmd = parsed.get("command", "")
+
+    if cmd == "BATCH":
+        body = line.split()
+        if len(body) >= 3 and body[-3].startswith("+"):
+            batch_id = body[-3][1:]
+            batch_type = body[-2]
+            channel = body[-1]
+            _begin_batch(batch_id, batch_type, channel, tags)
+        elif body and body[-1].startswith("-"):
+            _close_batch(body[-1][1:])
+        return line
+
+    if cmd == "PRIVMSG" and tags.get("batch"):
+        batch_id = tags["batch"]
+        text = parsed.get("arguments", "")
+        _append_batch_line(batch_id, text)
+        return ""
+
     kind = tags.get("+myorch.kind") or tags.get("myorch.kind")
     if not kind:
-        return line
-    if kind == "code":
         return line
     return line
 
