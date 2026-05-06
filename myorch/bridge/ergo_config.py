@@ -1,4 +1,6 @@
 import secrets
+import subprocess
+from pathlib import Path
 from textwrap import dedent
 
 import yaml
@@ -10,13 +12,78 @@ _OPER_PASSWORD_HASH = (
 )
 
 
+def _patch_overrides(
+    config: dict,
+    *,
+    host: str,
+    port: int,
+    server_name: str,
+    datastore_path: str,
+) -> dict:
+    config.setdefault("server", {})
+    config["server"]["name"] = server_name
+    config["server"]["listeners"] = {f"{host}:{port}": {}}
+    config["server"]["casemapping"] = "ascii"
+    config["server"]["enable-rfc3339-time"] = True
+    config["server"].setdefault("compatibility", {})["allow-truncation"] = False
+    config.setdefault("accounts", {})
+    config["accounts"]["authentication-enabled"] = False
+    config["accounts"].setdefault("registration", {})["enabled"] = True
+    config.setdefault("datastore", {})["path"] = datastore_path
+    config.setdefault("languages", {})["enabled"] = False
+    config.setdefault("opers", {})["claude-bot"] = {
+        "class": "server-admin",
+        "whois-line": "is the myorch bridge bot",
+        "password": _OPER_PASSWORD_HASH,
+    }
+    config.setdefault("oper-classes", {})["server-admin"] = {
+        "title": "Server Admin",
+        "capabilities": [
+            "kill",
+            "ban",
+            "oper:local_kill",
+            "oper:local_ban",
+            "oper:local_unban",
+            "rehash",
+            "accreg",
+        ],
+    }
+    return config
+
+
 def generate_ergo_config(
     host: str,
     port: int,
     server_name: str = "myorch.local",
     datastore_path: str = "ircd.db",
+    binary_path: Path | str | None = None,
 ) -> str:
-    """Return a YAML ergo config string for a loopback IRCv3 server."""
+    """Return a YAML ergo config string for a loopback IRCv3 server.
+
+    If ``binary_path`` is provided, runs ``<binary> defaultconfig`` to obtain
+    the upstream-blessed baseline (which evolves with ergo versions), then
+    patches in our overrides. Otherwise falls back to a static minimal config
+    suitable for tests but NOT guaranteed to satisfy ``ergo run``'s schema.
+    """
+
+    if binary_path is not None and Path(binary_path).exists():
+        result = subprocess.run(
+            [str(binary_path), "defaultconfig"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        config = yaml.safe_load(result.stdout)
+        return yaml.safe_dump(
+            _patch_overrides(
+                config,
+                host=host,
+                port=port,
+                server_name=server_name,
+                datastore_path=datastore_path,
+            ),
+            sort_keys=False,
+        )
 
     config = {
         "network": {"name": "myorch"},
@@ -73,6 +140,20 @@ def generate_ergo_config(
             "enabled": True,
             "channel-length": 2048,
             "client-length": 1024,
+        },
+        "limits": {
+            "nicklen": 32,
+            "identlen": 20,
+            "realnamelen": 150,
+            "channellen": 64,
+            "awaylen": 390,
+            "kicklen": 390,
+            "topiclen": 390,
+            "monitor-entries": 100,
+            "whowas-entries": 100,
+            "chan-list-modes": 100,
+            "registration-messages": 1024,
+            "multiline": {"max-bytes": 4096, "max-lines": 100},
         },
         "datastore": {"path": datastore_path},
         "logging": [

@@ -18,10 +18,17 @@ def test_setup_writes_toml_and_calls_ergo_fetch(monkeypatch, tmp_path: Path):
 
     def fake_download(target_dir, version, expected_sha256):
         target_dir.mkdir(parents=True, exist_ok=True)
-        (target_dir / "ergo").write_bytes(b"#!/bin/sh\n")
-        (target_dir / "ergo").chmod(0o755)
+        binary = target_dir / "ergo"
+        binary.write_text(
+            "#!/bin/sh\n"
+            'case "$1" in\n'
+            '  defaultconfig) printf "server:\\n  name: test\\n" ;;\n'
+            '  initdb) exit 0 ;;\n'
+            "esac\n"
+        )
+        binary.chmod(0o755)
         fetched_to.append(target_dir)
-        return target_dir / "ergo"
+        return binary
 
     monkeypatch.setattr("myorch.cli.download_ergo", fake_download, raising=False)
 

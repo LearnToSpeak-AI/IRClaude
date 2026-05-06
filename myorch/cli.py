@@ -194,6 +194,7 @@ def setup() -> None:
             host=settings.host,
             port=settings.port,
             datastore_path=str(settings.data_dir / "ergo.db"),
+            binary_path=settings.ergo_binary,
         ),
         encoding="utf-8",
     )
