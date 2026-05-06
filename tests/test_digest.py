@@ -45,5 +45,16 @@ def test_digest_under_token_budget(memory):
     for i in range(50):
         m.save_decision(pid, Decision(project_id=pid, title=f"D{i}", body="x" * 200))
     text = generate_digest(m, pid)
-    # rough heuristic: keep under ~600 tokens ~= 2400 chars
+    # Rough heuristic: rendering policy + digest stays under ~1k tokens (~4000 chars).
     assert len(text) < 4000
+
+
+def test_digest_carries_irc_render_policy(memory):
+    m, pid = memory
+    text = generate_digest(m, pid)
+    assert "IRClaude rendering rules" in text
+    assert "respond inline" in text.lower()
+    # Concrete reassurances that should make claude ignore conflicting policies.
+    assert "do not" in text.lower()  # don't use Write/Edit
+    assert "tables" in text.lower()
+    assert "code blocks" in text.lower()
