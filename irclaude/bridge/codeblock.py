@@ -1,5 +1,6 @@
 import re
 
+from irclaude.bridge.markdown import markdown_to_irc
 from irclaude.irc.protocol import encode_batch, encode_multiline, new_batch_id
 
 
@@ -34,7 +35,9 @@ class CodeBlockBuffer:
             return []
         tags = self._common_tags()
         tags["+irclaude.kind"] = "text"
-        return encode_multiline(target=self.channel, content=text, tags=tags)
+        return encode_multiline(
+            target=self.channel, content=markdown_to_irc(text), tags=tags
+        )
 
     def _emit_code_block(self, lang: str, lines: list[str]) -> list[str]:
         if not lines:
