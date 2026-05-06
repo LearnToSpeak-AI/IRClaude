@@ -92,6 +92,36 @@ def status() -> None:
     console.print(table)
 
 
+_APPS_ROOT_CANDIDATES = (
+    "Documents/APPS",
+    "Documents/projects",
+    "Documents/code",
+    "code",
+    "dev",
+    "src",
+    "workspace",
+    "projects",
+)
+
+
+def _suggest_apps_root(default: Path) -> Path:
+    home = Path.home()
+    for rel in _APPS_ROOT_CANDIDATES:
+        candidate = home / rel
+        if candidate.exists() and any(child.is_dir() for child in candidate.iterdir()):
+            return candidate
+    return default
+
+
+def _prompt_for_apps_root(default: Path) -> Path:
+    suggested = _suggest_apps_root(default)
+    raw = typer.prompt(
+        "Where are your project folders located?",
+        default=str(suggested),
+    )
+    return Path(raw).expanduser().resolve()
+
+
 @app.command()
 def setup() -> None:
     """First-run wizard: download ergo, scan projects, install plugin."""
@@ -104,15 +134,25 @@ def setup() -> None:
         version=pin.version,
         expected_sha256=pin.sha256,
     )
+
+    if "MYORCH_APPS_ROOT" not in os.environ:
+        chosen = _prompt_for_apps_root(settings.apps_root)
+        if chosen != settings.apps_root:
+            settings = settings.model_copy(update={"apps_root": chosen})
+
     _write_default_config(
         settings.config_file, apps_root=settings.apps_root, port=settings.port
     )
     settings.data_dir.mkdir(parents=True, exist_ok=True)
+    settings.apps_root.mkdir(parents=True, exist_ok=True)
     conn = connect(settings.db_path); init_schema(conn)
     mem = MemoryService(conn)
     registry = ProjectRegistry(memory=mem, apps_root=settings.apps_root)
     found = registry.scan()
     console.print(f"Scanned [bold]{len(found)}[/bold] projects under {settings.apps_root}")
+    if found:
+        for p in found:
+            console.print(f"  - {p.name}")
 
     pdir = detect_weechat_plugin_dir()
     if pdir is None:
