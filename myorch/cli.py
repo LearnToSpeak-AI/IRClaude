@@ -144,28 +144,70 @@ def setup_weechat() -> None:
     console.print(f"Linked plugin to {target}")
 
 
-@app.command()
-def scan() -> None:
-    """Re-scan apps_root for projects."""
-    console.print("[stub] scan")
-
-
 @app.command(name="list")
 def list_cmd() -> None:
-    """List projects with last-activity preview."""
-    console.print("[stub] list")
+    """List known projects with last-activity preview."""
+    settings = load_settings()
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    conn = connect(settings.db_path); init_schema(conn)
+    mem = MemoryService(conn)
+    table = Table(title="projects")
+    table.add_column("name")
+    table.add_column("path")
+    table.add_column("last activity")
+    for p in mem.list_projects():
+        table.add_row(p.name, p.path, str(p.last_opened_at or "-"))
+    console.print(table)
 
 
 @app.command()
 def search(query: str = typer.Argument(...)) -> None:
-    """Full-text search across recalls + decisions."""
-    console.print(f"[stub] search {query}")
+    """Full-text search across recalls + decisions, all projects."""
+    settings = load_settings()
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    conn = connect(settings.db_path); init_schema(conn)
+    mem = MemoryService(conn)
+    any_hit = False
+    for proj in mem.list_projects():
+        hits = mem.recall(proj.id, query, limit=10)
+        if not hits:
+            continue
+        any_hit = True
+        console.print(f"[bold]{proj.name}[/bold]")
+        for h in hits:
+            console.print(f"  - {h.snippet}")
+    if not any_hit:
+        console.print("(no matches)")
 
 
 @app.command()
 def decisions(project: str = typer.Argument(...)) -> None:
-    """List decisions for one project."""
-    console.print(f"[stub] decisions {project}")
+    settings = load_settings()
+    conn = connect(settings.db_path); init_schema(conn)
+    mem = MemoryService(conn)
+    proj = mem.get_project_by_name(project)
+    if proj is None:
+        console.print(f"[red]unknown project[/red] {project}")
+        raise typer.Exit(code=2)
+    table = Table(title=f"decisions — {project}")
+    table.add_column("title"); table.add_column("body")
+    for d in mem.list_decisions(proj.id):
+        table.add_row(d.title, d.body)
+    console.print(table)
+
+
+@app.command()
+def scan() -> None:
+    settings = load_settings()
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    conn = connect(settings.db_path); init_schema(conn)
+    mem = MemoryService(conn)
+    settings.apps_root.mkdir(parents=True, exist_ok=True)
+    registry = ProjectRegistry(memory=mem, apps_root=settings.apps_root)
+    found = registry.scan()
+    console.print(f"scanned {len(found)} projects under {settings.apps_root}")
+    for p in found:
+        console.print(f"  - {p.name}")
 
 
 @app.command()
