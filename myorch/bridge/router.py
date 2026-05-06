@@ -72,6 +72,8 @@ class _ChannelQueue:
             text = await self._queue.get()
             try:
                 await self._runner(self._channel, text)
+            except Exception as exc:
+                print(f"[router] runner failed on {self._channel}: {exc!r}")
             finally:
                 self._queue.task_done()
 

@@ -28,6 +28,7 @@ class ClaudeRunner:
         *,
         executable: Path | str = "claude",
         idle_timeout_s: float = 30.0,
+        is_resume: bool = True,
     ) -> None:
         self.cwd = Path(cwd)
         self.claude_uuid = claude_uuid
@@ -37,16 +38,19 @@ class ClaudeRunner:
             Path(shutil.which(executable) or executable)
         )
         self.idle_timeout_s = idle_timeout_s
+        self.is_resume = is_resume
         self.last_result: TurnResult | None = None
 
     def _argv(self, prompt: str) -> list[str]:
+        session_flag = "--resume" if self.is_resume else "--session-id"
         return [
             str(self.executable),
             "-p",
-            "--resume",
+            session_flag,
             self.claude_uuid,
             "--output-format",
             "stream-json",
+            "--verbose",
             "--append-system-prompt",
             f"@{self.digest_path}",
             "--mcp-config",

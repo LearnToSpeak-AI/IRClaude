@@ -67,11 +67,17 @@ class Bridge:
     async def _handle_turn(self, channel: str, prompt: str) -> None:
         project = self.router.project_for_channel(channel)
         if project is None:
+            print(f"[bridge] no project bound to {channel}, ignoring: {prompt!r}")
             return
         ctx = prepare_session(project=project, memory=self.memory, settings=self.settings)
         self.router.bind_session(channel, ctx.session_id)
         turn_id = self._turn_counters.get(channel, 0) + 1
         self._turn_counters[channel] = turn_id
+        mode = "resume" if ctx.is_resume else "new"
+        print(
+            f"[bridge] turn {turn_id} on {channel} ({project.name}, {mode} {ctx.claude_uuid}): "
+            f"{prompt!r}"
+        )
 
         runner = ClaudeRunner(
             cwd=Path(project.path),
@@ -79,31 +85,41 @@ class Bridge:
             mcp_config_path=ctx.mcp_config_path,
             digest_path=ctx.digest_path,
             executable=self.claude_executable,
+            is_resume=ctx.is_resume,
         )
         buffer = CodeBlockBuffer(channel=channel, session_id=ctx.claude_uuid, turn_id=turn_id)
-        async for event in runner.run_turn(prompt):
-            starts, ends, normal = classify_agent_events([event])
-            for s in starts:
-                await self.agents.agent_start(s["name"], channel)
-            for n in normal:
-                msgs = translate(
-                    n,
-                    channel=channel,
-                    session_id=ctx.claude_uuid,
-                    turn_id=turn_id,
-                    agent_nick=n.get("subagent"),
-                )
-                for m in msgs:
-                    text = m.params[1] if len(m.params) > 1 else ""
-                    if m.tags.get("+myorch.kind") in {"text", "agent-msg"}:
-                        for line in buffer.feed(text + "\n"):
-                            await self._send_raw(line)
-                    else:
-                        await self.client.send(m)
-            for e in ends:
-                await self.agents.agent_end(e["name"], channel)
-        for line in buffer.flush():
-            await self._send_raw(line)
+        try:
+            async for event in runner.run_turn(prompt):
+                starts, ends, normal = classify_agent_events([event])
+                for s in starts:
+                    await self.agents.agent_start(s["name"], channel)
+                for n in normal:
+                    msgs = translate(
+                        n,
+                        channel=channel,
+                        session_id=ctx.claude_uuid,
+                        turn_id=turn_id,
+                        agent_nick=n.get("subagent"),
+                    )
+                    for m in msgs:
+                        text = m.params[1] if len(m.params) > 1 else ""
+                        if m.tags.get("+myorch.kind") in {"text", "agent-msg"}:
+                            for line in buffer.feed(text + "\n"):
+                                await self._send_raw(line)
+                        else:
+                            await self.client.send(m)
+                for e in ends:
+                    await self.agents.agent_end(e["name"], channel)
+            for line in buffer.flush():
+                await self._send_raw(line)
+        except Exception as exc:
+            print(f"[bridge] turn {turn_id} on {channel} failed: {exc!r}")
+        result = runner.last_result
+        if result is not None and result.exit_code != 0:
+            print(
+                f"[bridge] claude exited {result.exit_code} on {channel}; "
+                f"stderr: {result.stderr.strip()!r}"
+            )
 
     async def _send_raw(self, wire_line: str) -> None:
         assert self.client is not None

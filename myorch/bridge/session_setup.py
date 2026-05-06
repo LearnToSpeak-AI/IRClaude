@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
+from myorch.bridge.claude_runner import _claude_conversation_exists
 from myorch.config import Settings
 from myorch.digest import generate_digest
 from myorch.models import Project
@@ -17,6 +18,7 @@ class SessionContext:
     claude_uuid: str
     digest_path: Path
     mcp_config_path: Path
+    is_resume: bool = False
 
 
 def _write_digest(project: Project, memory: MemoryService) -> Path:
@@ -53,9 +55,10 @@ def prepare_session(
     settings: Settings,
 ) -> SessionContext:
     session = memory.start_session(project.id)
-    claude_uuid = project.last_session_id or str(uuid.uuid4())
-    if not project.last_session_id:
-        memory.set_claude_session_id(session.id, claude_uuid)
+    candidate = project.last_session_id
+    is_resume = bool(candidate) and _claude_conversation_exists(candidate)
+    claude_uuid = candidate if is_resume else str(uuid.uuid4())
+    memory.set_claude_session_id(session.id, claude_uuid)
 
     digest_path = _write_digest(project, memory)
     mcp_path = _write_mcp_config(project, settings)
@@ -65,4 +68,5 @@ def prepare_session(
         claude_uuid=claude_uuid,
         digest_path=digest_path,
         mcp_config_path=mcp_path,
+        is_resume=is_resume,
     )
