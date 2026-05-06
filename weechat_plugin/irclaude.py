@@ -1,23 +1,10 @@
 """WeeChat plugin for irclaude — render IRCv3 +irclaude.* tagged events."""
 
-import os
-
 import weechat
 
 
 PLUGIN_NAME = "irclaude"
 PLUGIN_VERSION = "2.0.0"
-
-
-_DEBUG_PATH = os.path.expanduser("~/.local/share/irclaude/run/plugin.log")
-
-
-def _debug(msg: str) -> None:
-    try:
-        with open(_DEBUG_PATH, "a", encoding="utf-8") as fh:
-            fh.write(msg + "\n")
-    except OSError:
-        pass
 
 
 _state: dict[str, object] = {
@@ -124,11 +111,6 @@ def cb_modifier_privmsg(data, modifier, modifier_data, line):
     parsed = weechat.info_get_hashtable("irc_message_parse", {"message": line})
     tags = _parse_tags(parsed.get("tags", ""))
     cmd = parsed.get("command", "")
-    if cmd == "BATCH" or "batch" in tags or any(k.startswith("+irclaude.") for k in tags):
-        _debug(
-            f"mod={modifier} server={modifier_data} cmd={cmd} "
-            f"tags={tags} line={line[:240]}"
-        )
 
     chan = parsed.get("channel") or _STATUS["channel"]
     if chan and chan.startswith("#"):
@@ -148,6 +130,11 @@ def cb_modifier_privmsg(data, modifier, modifier_data, line):
         except ValueError:
             return line
         args = body[bidx + 1:]
+        if args:
+            # IRC trailing parameter has a leading ':' (e.g. ergo emits
+            # `BATCH :-<id>` for close and `BATCH +<id> draft/multiline :#ch`
+            # for open). Strip it from the last token before parsing.
+            args[-1] = args[-1].lstrip(":")
         if args and args[0].startswith("+") and len(args) >= 3:
             batch_id = args[0][1:]
             batch_type = args[1]

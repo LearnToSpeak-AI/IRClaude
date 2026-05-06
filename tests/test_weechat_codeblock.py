@@ -59,3 +59,25 @@ def test_two_codeblocks_get_distinct_buffer_indices(plugin):
     _send_batch(stub, "#foo", "python", ["b = 2"])
     assert "code:#foo:1" in stub._buffers
     assert "code:#foo:2" in stub._buffers
+
+
+def test_ergo_style_batch_close_with_leading_colon(plugin):
+    """Regression: ergo emits 'BATCH :-<id>' (IRC trailing-parameter syntax).
+
+    The plugin must strip the leading ':' before recognising close.
+    """
+    stub, _ = plugin
+    stub.buffer_new(f"{SERVER}.#foo", "", "", "", "")
+    open_line = (
+        "@batch=Z;+irclaude.kind=code;+irclaude.codeblock=python "
+        ":server.local BATCH +Z draft/multiline :#foo"
+    )
+    stub.call_modifier("irc_in2_privmsg", SERVER, open_line)
+    inner = "@batch=Z :n!u@h PRIVMSG #foo :z = 99"
+    stub.call_modifier("irc_in2_privmsg", SERVER, inner)
+    close_line = ":server.local BATCH :-Z"
+    stub.call_modifier("irc_in2_privmsg", SERVER, close_line)
+    # Code buffer should exist and the marker should land in the channel buffer.
+    assert "code:#foo:1" in stub._buffers
+    main_lines = [t for buf, t in stub._printed if buf == f"{SERVER}.#foo"]
+    assert any("code:#foo:1" in t for t in main_lines)
