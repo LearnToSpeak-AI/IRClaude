@@ -1,47 +1,93 @@
 # MyOrchestrator
 
-Local web orchestrator for managing multiple Claude Code sessions across projects in `~/Documents/APPS/`. Single browser pane: project list, terminal per project, dev server controls, persistent memory in SQLite.
+Local IRC-driven orchestrator for multi-project Claude Code sessions.
 
-**No API key.** Uses your authenticated `claude` CLI subprocess (Pro/Max subscription).
+<!-- TODO: record after first manual e2e -->
+[Asciinema demo placeholder — link added once recording exists.]
+
+## What is this
+
+`myorch` lets you talk to Claude Code from your favorite chat client (WeeChat),
+one IRC channel per project, without running a web server, without an API key,
+and without losing context across sessions. Memory persists in SQLite.
+
+## Why
+
+- IRC is a perfect transport for "human + agents in a channel."
+- WeeChat is uniquely scriptable — code blocks render in free buffers, agents
+  appear as nicks, status bar shows session metadata.
+- ergo gives us modern IRCv3 (message-tags, BATCH, draft/multiline) on a
+  single Go binary.
+
+## Architecture
+
+```
+WeeChat -> ergo (127.0.0.1:6667) -> Python bridge -> claude -p (subprocess)
+                                            |
+                                            +-> SQLite memory + MCP server
+```
 
 ## Requirements
 
 - Python 3.11+
-- `claude` CLI installed and authenticated (`npm install -g @anthropic-ai/claude-code`)
-- Linux/macOS
+- WeeChat 4.3+ (for rich rendering; any IRC client works for plain chat)
+- Linux or macOS (Windows untested in V2)
 
 ## Install
 
-```bash
-git clone <repo> && cd MyOrchestrator
-python3 -m venv .venv && . .venv/bin/activate
-pip install -e ".[dev]"
+```sh
+pipx install myorch
+myorch setup
 ```
 
-## Run
+`myorch setup` downloads the pinned ergo binary, scans `MYORCH_APPS_ROOT`,
+writes `~/.config/myorch/config.toml`, and offers to install the WeeChat
+plugin.
 
-```bash
-. .venv/bin/activate
-uvicorn myorch.app:create_app --factory --host 127.0.0.1 --port 7000
+## Daily use
+
+```sh
+myorch start
+# in another terminal:
+weechat
+# /server add myorch 127.0.0.1/6667
+# /connect myorch
+# /join #yourproject
 ```
-
-Open http://127.0.0.1:7000 — click "+ Scan" to discover your projects.
 
 ## Configuration
 
-Environment variables (defaults shown):
-- `MYORCH_APPS_ROOT=/home/$USER/Documents/APPS`
-- `MYORCH_DATA_DIR=$HOME/.myorch`
-- `MYORCH_TMP_DIR=/tmp/myorch`
-- `MYORCH_HOST=127.0.0.1`
-- `MYORCH_PORT=7000`
+| Env var              | Default                          | Meaning            |
+|----------------------|----------------------------------|--------------------|
+| `MYORCH_APPS_ROOT`   | `~/projects`                     | Where to scan      |
+| `MYORCH_DATA_DIR`    | `$XDG_DATA_HOME/myorch`          | DB + ergo binary   |
+| `MYORCH_CONFIG_FILE` | `$XDG_CONFIG_HOME/myorch/config.toml` | TOML overrides |
+| `MYORCH_PORT`        | `6667`                           | ergo bind port     |
 
-## Tests
+`config.toml` schema:
 
-```bash
-pytest -v
+```toml
+apps_root = "/srv/projects"
+host = "127.0.0.1"
+port = 6667
 ```
 
-## Architecture
+## FAQ
 
-See `docs/superpowers/specs/2026-05-05-myorchestrator-design.md`.
+**Why no API key?** `myorch` shells out to the `claude` CLI on every turn,
+using your existing Claude Code subscription. There is no `ANTHROPIC_API_KEY`
+in the codebase or runtime — by design.
+
+**Without the WeeChat plugin?** Chat still works on any IRC client. Code
+blocks appear as raw `BATCH` lines (visible, unstyled). Agents still show up
+as JOIN/PART nicks.
+
+## Contributing
+
+PRs welcome. Run `pytest -q` (requires `ergo` on `$PATH` for integration
+tests; install via `myorch setup` once or `apt install ergo`/`brew install
+ergo`).
+
+## License
+
+MIT — see `LICENSE`.
