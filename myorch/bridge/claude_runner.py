@@ -60,12 +60,15 @@ class ClaudeRunner:
 
     async def run_turn(self, prompt: str) -> AsyncIterator[dict]:
         argv = self._argv(prompt)
+        print(f"[claude] spawn argv={argv}")
         proc = await asyncio.create_subprocess_exec(
             *argv,
             cwd=str(self.cwd),
+            stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
+        events = 0
         try:
             assert proc.stdout is not None
             while True:
@@ -74,6 +77,7 @@ class ClaudeRunner:
                         proc.stdout.readline(), timeout=self.idle_timeout_s
                     )
                 except asyncio.TimeoutError:
+                    print(f"[claude] idle timeout after {self.idle_timeout_s}s, terminating")
                     proc.terminate()
                     raise
                 if not raw:
@@ -81,10 +85,13 @@ class ClaudeRunner:
                 line = raw.decode("utf-8", errors="replace").strip()
                 if not line:
                     continue
+                print(f"[claude] <- {line[:200]}")
                 try:
-                    yield json.loads(line)
+                    event = json.loads(line)
                 except json.JSONDecodeError:
                     continue
+                events += 1
+                yield event
         finally:
             with contextlib.suppress(ProcessLookupError):
                 if proc.returncode is None:
@@ -94,6 +101,10 @@ class ClaudeRunner:
             self.last_result = TurnResult(
                 exit_code=proc.returncode or 0,
                 stderr=stderr_b.decode("utf-8", errors="replace"),
+            )
+            print(
+                f"[claude] exit={self.last_result.exit_code} events={events} "
+                f"stderr={self.last_result.stderr.strip()[:300]!r}"
             )
 
 
