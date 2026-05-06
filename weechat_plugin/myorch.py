@@ -156,7 +156,7 @@ def shutdown_cb():
 
 weechat.register(
     PLUGIN_NAME,
-    "ipena",
+    "Ivan Pena",
     PLUGIN_VERSION,
     "MIT",
     "MyOrchestrator IRC bridge plugin",
