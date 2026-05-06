@@ -56,6 +56,16 @@ def weechat_running() -> bool:
     return out.returncode == 0
 
 
+_MISSING_HEADLESS_HINT = (
+    "weechat-headless not found on PATH (needed for auto-config). Install it:\n"
+    "  Ubuntu/Debian:  sudo apt install weechat-headless\n"
+    "  Fedora/RHEL:    sudo dnf install weechat-headless\n"
+    "  Arch:           sudo pacman -S weechat (includes weechat-headless)\n"
+    "  macOS:          brew install weechat\n"
+    "Then rerun: irclaude setup-weechat"
+)
+
+
 def add_weechat_server_via_headless(
     name: str,
     host: str,
@@ -69,11 +79,12 @@ def add_weechat_server_via_headless(
     success so reruns of `irclaude setup` don't fail.
 
     Returns (ok, message). `ok` is False only when weechat-headless is missing or the
-    subprocess invocation itself errored.
+    subprocess invocation itself errored. When the binary is missing, the message
+    includes per-OS install commands.
     """
     bin_path = binary or shutil.which("weechat-headless")
     if bin_path is None:
-        return False, "weechat-headless not found on PATH"
+        return False, _MISSING_HEADLESS_HINT
     cmd = [
         bin_path,
         "--run-command",

@@ -10,6 +10,8 @@ def test_returns_false_when_binary_missing(monkeypatch):
     ok, msg = add_weechat_server_via_headless("irclaude", "127.0.0.1", 6667)
     assert ok is False
     assert "not found" in msg
+    assert "apt install weechat-headless" in msg
+    assert "brew install weechat" in msg
 
 
 def test_invokes_headless_with_no_tls_autoconnect(monkeypatch):

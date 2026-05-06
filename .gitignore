@@ -36,3 +36,4 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+/Images_Reference/
