@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import signal as _signal
 from pathlib import Path
 
 from myorch.bridge.agents import AgentManager
@@ -117,3 +118,25 @@ class Bridge:
         if self.client is not None:
             with contextlib.suppress(Exception):
                 await self.client.close()
+
+    async def run_with_signals(self) -> None:
+        loop = asyncio.get_event_loop()
+        stop_event = asyncio.Event()
+
+        def _request_stop() -> None:
+            stop_event.set()
+
+        for sig in (_signal.SIGINT, _signal.SIGTERM):
+            with contextlib.suppress(NotImplementedError):
+                loop.add_signal_handler(sig, _request_stop)
+
+        run_task = asyncio.create_task(self.run())
+        stop_wait = asyncio.create_task(stop_event.wait())
+        done, _ = await asyncio.wait(
+            {run_task, stop_wait}, return_when=asyncio.FIRST_COMPLETED
+        )
+        if stop_wait in done:
+            await self.stop()
+            run_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await run_task
