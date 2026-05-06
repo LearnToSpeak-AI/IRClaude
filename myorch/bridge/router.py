@@ -148,3 +148,12 @@ class ChannelRouter:
                 break
             await asyncio.sleep(poll_interval)
         self.memory.close_session(session_id, SessionStatus.closed)
+
+    async def shutdown_all(self, *, poll_interval: float = 1.0, max_wait: float = 30.0) -> None:
+        sessions = getattr(self, "_sessions", {})
+        await asyncio.gather(
+            *[
+                self.idle_close(channel, poll_interval=poll_interval, max_wait=max_wait)
+                for channel in list(sessions.keys())
+            ]
+        )
