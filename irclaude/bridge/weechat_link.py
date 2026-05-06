@@ -1,6 +1,8 @@
 import os
+import platform
 import shutil
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -64,6 +66,50 @@ _MISSING_HEADLESS_HINT = (
     "  macOS:          brew install weechat\n"
     "Then rerun: irclaude setup-weechat"
 )
+
+
+@dataclass(frozen=True)
+class PackageInstallPlan:
+    """A resolved install command for a given OS package manager."""
+    manager: str
+    command: tuple[str, ...]
+
+
+def detect_weechat_install_plan() -> PackageInstallPlan | None:
+    """Best-effort detection of how to install weechat-headless on this OS.
+
+    Returns None if no supported package manager is found.
+    """
+    if platform.system() == "Darwin":
+        if shutil.which("brew"):
+            return PackageInstallPlan("brew", ("brew", "install", "weechat"))
+        return None
+    if shutil.which("apt-get"):
+        return PackageInstallPlan(
+            "apt", ("sudo", "apt-get", "install", "-y", "weechat-headless")
+        )
+    if shutil.which("dnf"):
+        return PackageInstallPlan(
+            "dnf", ("sudo", "dnf", "install", "-y", "weechat-headless")
+        )
+    if shutil.which("pacman"):
+        return PackageInstallPlan(
+            "pacman", ("sudo", "pacman", "-S", "--noconfirm", "weechat")
+        )
+    return None
+
+
+def install_weechat_headless(plan: PackageInstallPlan) -> tuple[bool, str]:
+    """Run the package-manager command interactively so the user sees sudo prompts
+    and progress output. Returns (ok, message).
+    """
+    try:
+        rc = subprocess.run(list(plan.command), check=False, timeout=600).returncode
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, f"install command failed: {exc}"
+    if rc != 0:
+        return False, f"install via {plan.manager} exited with code {rc}"
+    return True, f"installed weechat-headless via {plan.manager}"
 
 
 def add_weechat_server_via_headless(

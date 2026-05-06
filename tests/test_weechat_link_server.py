@@ -2,7 +2,12 @@ from unittest import mock
 
 import pytest
 
-from irclaude.bridge.weechat_link import add_weechat_server_via_headless, weechat_running
+from irclaude.bridge.weechat_link import (
+    add_weechat_server_via_headless,
+    detect_weechat_install_plan,
+    install_weechat_headless,
+    weechat_running,
+)
 
 
 def test_returns_false_when_binary_missing(monkeypatch):
@@ -96,3 +101,81 @@ def test_weechat_running_false_when_pgrep_finds_nothing(monkeypatch):
         lambda *a, **kw: mock.Mock(returncode=1, stdout="", stderr=""),
     )
     assert weechat_running() is False
+
+
+def test_detect_install_plan_apt_on_debian(monkeypatch):
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+    monkeypatch.setattr(
+        "shutil.which",
+        lambda name: "/usr/bin/apt-get" if name == "apt-get" else None,
+    )
+    plan = detect_weechat_install_plan()
+    assert plan is not None
+    assert plan.manager == "apt"
+    assert "apt-get" in plan.command
+    assert "weechat-headless" in plan.command
+    assert plan.command[0] == "sudo"
+
+
+def test_detect_install_plan_dnf_on_fedora(monkeypatch):
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+    monkeypatch.setattr(
+        "shutil.which",
+        lambda name: "/usr/bin/dnf" if name == "dnf" else None,
+    )
+    plan = detect_weechat_install_plan()
+    assert plan is not None
+    assert plan.manager == "dnf"
+
+
+def test_detect_install_plan_pacman_on_arch(monkeypatch):
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+    monkeypatch.setattr(
+        "shutil.which",
+        lambda name: "/usr/bin/pacman" if name == "pacman" else None,
+    )
+    plan = detect_weechat_install_plan()
+    assert plan is not None
+    assert plan.manager == "pacman"
+
+
+def test_detect_install_plan_brew_on_macos(monkeypatch):
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+    monkeypatch.setattr(
+        "shutil.which",
+        lambda name: "/opt/homebrew/bin/brew" if name == "brew" else None,
+    )
+    plan = detect_weechat_install_plan()
+    assert plan is not None
+    assert plan.manager == "brew"
+    assert plan.command[0] == "brew"
+
+
+def test_detect_install_plan_returns_none_on_unknown(monkeypatch):
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+    monkeypatch.setattr("shutil.which", lambda name: None)
+    assert detect_weechat_install_plan() is None
+
+
+def test_install_weechat_headless_returns_ok_on_zero_exit(monkeypatch):
+    from irclaude.bridge.weechat_link import PackageInstallPlan
+    plan = PackageInstallPlan("apt", ("sudo", "apt-get", "install", "-y", "weechat-headless"))
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda *a, **kw: mock.Mock(returncode=0),
+    )
+    ok, msg = install_weechat_headless(plan)
+    assert ok is True
+    assert "apt" in msg
+
+
+def test_install_weechat_headless_returns_failure_on_nonzero_exit(monkeypatch):
+    from irclaude.bridge.weechat_link import PackageInstallPlan
+    plan = PackageInstallPlan("apt", ("sudo", "apt-get", "install", "-y", "weechat-headless"))
+    monkeypatch.setattr(
+        "subprocess.run",
+        lambda *a, **kw: mock.Mock(returncode=100),
+    )
+    ok, msg = install_weechat_headless(plan)
+    assert ok is False
+    assert "100" in msg

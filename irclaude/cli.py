@@ -13,7 +13,9 @@ from irclaude.bridge.preflight import check_claude
 from irclaude.bridge.server import ErgoServer
 from irclaude.bridge.weechat_link import (
     add_weechat_server_via_headless,
+    detect_weechat_install_plan,
     detect_weechat_plugin_dir,
+    install_weechat_headless,
     repo_plugin_path,
     weechat_running,
 )
@@ -274,26 +276,58 @@ def setup() -> None:
         target.symlink_to(repo_plugin_path())
         console.print(f"[green]✓[/green] Linked plugin to {target}")
 
-    server_configured = False
+    server_configured = _configure_weechat_server(settings)
+    _print_next_steps(settings, weechat_configured=server_configured)
+
+
+def _configure_weechat_server(settings) -> bool:
+    """Prompt + auto-add the irclaude server to WeeChat. Installs weechat-headless
+    on demand if the user agrees. Returns True iff the server entry is in irc.conf.
+    """
     if weechat_running():
         console.print(
             "[yellow]WeeChat is currently running[/yellow] — skipping auto server config "
             "(close WeeChat first, then rerun [cyan]irclaude setup-weechat[/cyan])."
         )
-    else:
-        confirm = typer.prompt(
-            f"Auto-configure WeeChat server '{settings.host}/{settings.port}' (no-TLS)? [Y/n]",
-            default="y",
-        )
-        if confirm.lower().startswith("y"):
-            ok, msg = add_weechat_server_via_headless(
-                "irclaude", settings.host, settings.port
-            )
-            tag = "[green]✓[/green]" if ok else "[yellow]✗[/yellow]"
-            console.print(f"{tag} {msg}")
-            server_configured = ok
+        return False
+    confirm = typer.prompt(
+        f"Auto-configure WeeChat server '{settings.host}/{settings.port}' (no-TLS)? [Y/n]",
+        default="y",
+    )
+    if not confirm.lower().startswith("y"):
+        return False
 
-    _print_next_steps(settings, weechat_configured=server_configured)
+    ok, msg = add_weechat_server_via_headless(
+        "irclaude", settings.host, settings.port
+    )
+    if ok:
+        console.print(f"[green]✓[/green] {msg}")
+        return True
+
+    if "not found on PATH" in msg:
+        plan = detect_weechat_install_plan()
+        if plan is not None:
+            cmd_str = " ".join(plan.command)
+            console.print(f"[yellow]weechat-headless not installed[/yellow]")
+            confirm = typer.prompt(
+                f"Run '{cmd_str}' now? [Y/n]", default="y"
+            )
+            if confirm.lower().startswith("y"):
+                inst_ok, inst_msg = install_weechat_headless(plan)
+                if inst_ok:
+                    console.print(f"[green]✓[/green] {inst_msg}")
+                    ok, msg = add_weechat_server_via_headless(
+                        "irclaude", settings.host, settings.port
+                    )
+                    tag = "[green]✓[/green]" if ok else "[yellow]✗[/yellow]"
+                    console.print(f"{tag} {msg}")
+                    return ok
+                console.print(f"[yellow]✗[/yellow] {inst_msg}")
+                return False
+        # No plan or user declined — fall through to printing the manual hint.
+
+    console.print(f"[yellow]✗[/yellow] {msg}")
+    return False
 
 
 def _print_next_steps(settings, *, weechat_configured: bool) -> None:
@@ -330,21 +364,7 @@ def setup_weechat() -> None:
     target.symlink_to(repo_plugin_path())
     console.print(f"[green]✓[/green] Linked plugin to {target}")
 
-    if weechat_running():
-        console.print(
-            "[yellow]WeeChat is running[/yellow] — close it before configuring the server."
-        )
-        return
-    confirm = typer.prompt(
-        f"Auto-configure WeeChat server '{settings.host}/{settings.port}' (no-TLS)? [Y/n]",
-        default="y",
-    )
-    if confirm.lower().startswith("y"):
-        ok, msg = add_weechat_server_via_headless(
-            "irclaude", settings.host, settings.port
-        )
-        tag = "[green]✓[/green]" if ok else "[yellow]✗[/yellow]"
-        console.print(f"{tag} {msg}")
+    _configure_weechat_server(settings)
 
 
 @app.command(name="list")
