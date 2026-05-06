@@ -68,6 +68,9 @@ class IrcClient:
     async def send(self, msg: Message) -> None:
         await self._send_raw(msg.encode().rstrip("\r\n"))
 
+    async def send_text(self, target: str, text: str, tags: dict[str, str] | None = None) -> None:
+        await self.send(Message(command="PRIVMSG", params=[target, text], tags=tags or {}))
+
     async def recv(self) -> Message:
         return await self._inbox.get()
 
