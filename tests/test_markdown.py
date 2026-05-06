@@ -14,8 +14,10 @@ def test_bold_takes_priority_over_italic():
     assert out.startswith("\x02") and out.endswith("\x02")
 
 
-def test_inline_code_uses_monospace_marker():
-    assert markdown_to_irc("use `foo()` later") == "use \x11foo()\x11 later"
+def test_inline_code_uses_light_grey_color():
+    # \x11 (IRC monospace) renders as a stray caret on many terminals;
+    # we wrap in light grey + reset instead.
+    assert markdown_to_irc("use `foo()` later") == "use \x0314foo()\x0F later"
 
 
 def test_h1_header_becomes_bold_with_color():

@@ -85,7 +85,7 @@ class ClaudeRunner:
                 line = raw.decode("utf-8", errors="replace").strip()
                 if not line:
                     continue
-                print(f"[claude] <- {line[:200]}")
+                print(f"[claude] <- {line[:4000]}")
                 try:
                     event = json.loads(line)
                 except json.JSONDecodeError:

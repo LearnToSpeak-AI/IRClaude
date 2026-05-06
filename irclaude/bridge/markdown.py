@@ -58,7 +58,9 @@ def markdown_to_irc(text: str) -> str:
     out = _BOLD.sub(lambda m: f"\x02{m.group(1)}\x02", out)
     out = _STRIKE.sub(lambda m: f"\x1E{m.group(1)}\x1E", out)
     out = _ITAL.sub(lambda m: f"\x1D{m.group(1)}\x1D", out)
-    out = _INLINE_CODE.sub(lambda m: f"\x11{m.group(1)}\x11", out)
+    # Inline code: light-grey (\x0314) instead of \x11 (monospace) — not all
+    # terminals render \x11 and many display it as a stray caret/control char.
+    out = _INLINE_CODE.sub(lambda m: f"\x0314{m.group(1)}\x0F", out)
     out = _LINK.sub(lambda m: f"\x1F{m.group(1)}\x1F ({m.group(2)})", out)
     out = _QUOTE.sub(lambda m: f"\x0314▌\x0F {m.group(1)}", out)
     out = _LIST.sub("· ", out)
