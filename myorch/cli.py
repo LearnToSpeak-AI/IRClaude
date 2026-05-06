@@ -190,10 +190,24 @@ def setup() -> None:
 
     settings.etc_dir.mkdir(parents=True, exist_ok=True)
     settings.ergo_config.write_text(
-        generate_ergo_config(host=settings.host, port=settings.port),
+        generate_ergo_config(
+            host=settings.host,
+            port=settings.port,
+            datastore_path=str(settings.data_dir / "ergo.db"),
+        ),
         encoding="utf-8",
     )
     console.print(f"Wrote ergo config to {settings.ergo_config}")
+
+    import subprocess
+    initdb = subprocess.run(
+        [str(settings.ergo_binary), "initdb", "--conf", str(settings.ergo_config), "--quiet"],
+        capture_output=True,
+        text=True,
+    )
+    if initdb.returncode != 0 and "already exists" not in (initdb.stderr + initdb.stdout):
+        raise RuntimeError(f"ergo initdb failed: {initdb.stderr or initdb.stdout}")
+    console.print("Initialized ergo datastore")
 
     _write_default_config(
         settings.config_file, apps_root=settings.apps_root, port=settings.port

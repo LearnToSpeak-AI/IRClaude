@@ -14,6 +14,7 @@ def generate_ergo_config(
     host: str,
     port: int,
     server_name: str = "myorch.local",
+    datastore_path: str = "ircd.db",
 ) -> str:
     """Return a YAML ergo config string for a loopback IRCv3 server."""
 
@@ -73,7 +74,7 @@ def generate_ergo_config(
             "channel-length": 2048,
             "client-length": 1024,
         },
-        "datastore": {"path": ""},
+        "datastore": {"path": datastore_path},
         "logging": [
             {
                 "method": "stderr",
