@@ -138,6 +138,18 @@ def cb_modifier_privmsg(data, modifier, modifier_data, line):
     return line
 
 
+def cb_command_myorch(data, buffer, args):
+    parts = args.split()
+    if not parts:
+        weechat.prnt(buffer, "/myorch projects|recall|search|decisions|close|agents")
+        return weechat.WEECHAT_RC_OK()
+    sub = parts[0]
+    rest = " ".join(parts[1:])
+    payload = f"!{sub}" + (f" {rest}" if rest else "")
+    weechat.prnt(buffer, f"PRIVMSG claude :{payload}")
+    return weechat.WEECHAT_RC_OK()
+
+
 def shutdown_cb():
     return weechat.WEECHAT_RC_OK()
 
@@ -154,3 +166,12 @@ weechat.register(
 weechat.hook_modifier("irc_in2_privmsg", cb_modifier_privmsg, "")
 weechat.bar_item_new("myorch_status", cb_bar_status, "")
 weechat.hook_signal("*,irc_in2_join", cb_signal_join, "")
+weechat.hook_command(
+    "myorch",
+    "myorch helpers",
+    "[projects|recall|search|decisions|close|agents] <args>",
+    "subcommand args",
+    "",
+    cb_command_myorch,
+    "",
+)

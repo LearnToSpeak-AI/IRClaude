@@ -110,6 +110,47 @@ class Bridge:
         line = wire_line.rstrip("\r\n")
         await self.client._send_raw(line)
 
+    def _ensure_control_handlers(self) -> None:
+        if hasattr(self, "_control_handlers"):
+            return
+        self._control_handlers = {
+            "projects": self._ctl_projects,
+            "recall": self._ctl_recall,
+            "search": self._ctl_search,
+            "decisions": self._ctl_decisions,
+            "close": self._ctl_close,
+            "agents": self._ctl_agents,
+        }
+
+    def _handle_control(self, channel: str, text: str) -> bool:
+        self._ensure_control_handlers()
+        if not text.startswith("!"):
+            return False
+        first, _, rest = text[1:].partition(" ")
+        handler = self._control_handlers.get(first)
+        if handler is None:
+            return False
+        handler(channel, rest)
+        return True
+
+    def _ctl_projects(self, channel: str, args: str) -> None:
+        ...
+
+    def _ctl_recall(self, channel: str, args: str) -> None:
+        ...
+
+    def _ctl_search(self, channel: str, args: str) -> None:
+        ...
+
+    def _ctl_decisions(self, channel: str, args: str) -> None:
+        ...
+
+    def _ctl_close(self, channel: str, args: str) -> None:
+        ...
+
+    def _ctl_agents(self, channel: str, args: str) -> None:
+        ...
+
     async def stop(self) -> None:
         self._running = False
         if self.agents is not None:
