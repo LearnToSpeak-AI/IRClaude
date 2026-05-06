@@ -16,17 +16,24 @@ def plugin(monkeypatch):
     return weechat_stub, plugin
 
 
+SERVER = "irclaude"
+
+
 def _send_batch(stub, channel: str, lang: str, lines: list[str]) -> None:
+    # Real WeeChat creates a buffer named <server>.<channel> when the user
+    # joins; the plugin looks it up via buffer_search to print the code marker
+    # there.
+    stub.buffer_new(f"{SERVER}.{channel}", "", "", "", "")
     open_line = (
         f"@batch=ABC;+irclaude.kind=code;+irclaude.codeblock={lang} "
         f":server.local BATCH +ABC draft/multiline {channel}"
     )
-    stub.call_modifier("irc_in2_privmsg", "server.irc.irclaude", open_line)
+    stub.call_modifier("irc_in2_privmsg", SERVER, open_line)
     for line in lines:
         wire = f"@batch=ABC :n!u@h PRIVMSG {channel} :{line}"
-        stub.call_modifier("irc_in2_privmsg", "server.irc.irclaude", wire)
+        stub.call_modifier("irc_in2_privmsg", SERVER, wire)
     close_line = ":server.local BATCH -ABC"
-    stub.call_modifier("irc_in2_privmsg", "server.irc.irclaude", close_line)
+    stub.call_modifier("irc_in2_privmsg", SERVER, close_line)
 
 
 def test_codeblock_opens_free_buffer_with_lines(plugin):
@@ -42,7 +49,7 @@ def test_codeblock_opens_free_buffer_with_lines(plugin):
 def test_codeblock_leaves_marker_in_main_channel(plugin):
     stub, _ = plugin
     _send_batch(stub, "#foo", "python", ["x = 1"])
-    main_lines = [t for buf, t in stub._printed if buf == "#foo"]
+    main_lines = [t for buf, t in stub._printed if buf == f"{SERVER}.#foo"]
     assert any("code" in t.lower() and "code:#foo:1" in t for t in main_lines)
 
 

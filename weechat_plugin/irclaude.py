@@ -47,9 +47,12 @@ def _highlight_to_irc(language: str, text: str) -> str:
     return text
 
 
-def _begin_batch(batch_id: str, batch_type: str, channel: str, tags: dict) -> None:
+def _begin_batch(
+    batch_id: str, batch_type: str, channel: str, server: str, tags: dict
+) -> None:
     _BATCHES[batch_id] = {
         "channel": channel,
+        "server": server,
         "type": batch_type,
         "tags": tags,
         "lines": [],
@@ -67,16 +70,21 @@ def _close_batch(batch_id: str) -> None:
     info = _BATCHES.pop(batch_id, None)
     if info is None:
         return
-    if info["tags"].get("+irclaude.codeblock"):
-        lang = info["tags"]["+irclaude.codeblock"]
-        buf_name = _next_code_buffer_name(info["channel"])
-        weechat.buffer_new(buf_name, "", "", "", "")
-        weechat.buffer_set(buf_name, "type", "free")
-        weechat.buffer_set(buf_name, "title", f"{info['channel']} code [{lang}]")
-        for idx, line in enumerate(info["lines"], start=1):
-            weechat.prnt_y(buf_name, idx, _highlight_to_irc(lang, line))
-        marker = f"[code ({lang}, {len(info['lines'])} lines) -> /buffer {buf_name}]"
-        weechat.prnt(info["channel"], marker)
+    if not info["tags"].get("+irclaude.codeblock"):
+        return
+    lang = info["tags"]["+irclaude.codeblock"]
+    buf_name = _next_code_buffer_name(info["channel"])
+    buf_ptr = weechat.buffer_new(buf_name, "", "", "", "")
+    weechat.buffer_set(buf_ptr, "type", "free")
+    weechat.buffer_set(buf_ptr, "title", f"{info['channel']} code [{lang}]")
+    for idx, line in enumerate(info["lines"], start=1):
+        weechat.prnt_y(buf_ptr, idx, _highlight_to_irc(lang, line))
+    marker = f"[code ({lang}, {len(info['lines'])} lines) -> /buffer {buf_name}]"
+    chan_ptr = weechat.buffer_search(
+        "irc", f"{info['server']}.{info['channel']}"
+    )
+    if chan_ptr:
+        weechat.prnt(chan_ptr, marker)
 
 
 def cb_bar_status(data, item, window):
@@ -126,7 +134,7 @@ def cb_modifier_privmsg(data, modifier, modifier_data, line):
             batch_id = args[0][1:]
             batch_type = args[1]
             channel = args[2]
-            _begin_batch(batch_id, batch_type, channel, tags)
+            _begin_batch(batch_id, batch_type, channel, modifier_data, tags)
         elif args and args[0].startswith("-"):
             _close_batch(args[0][1:])
         return line
