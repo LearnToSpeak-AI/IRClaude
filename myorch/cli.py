@@ -1,7 +1,10 @@
+import os
+import signal as _signal
 from pathlib import Path
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 from myorch.bridge.ergo_fetch import download_ergo, parse_version_pin
 from myorch.bridge.weechat_link import detect_weechat_plugin_dir, repo_plugin_path
@@ -12,6 +15,28 @@ from myorch.services.project_registry import ProjectRegistry
 
 app = typer.Typer(help="Local IRC orchestrator for multi-project Claude Code.")
 console = Console()
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def _launch_bridge_blocking(settings) -> None:
+    import asyncio
+
+    from myorch.bridge import Bridge
+    from myorch.db import connect, init_schema
+    from myorch.services.memory_service import MemoryService
+
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    conn = connect(settings.db_path); init_schema(conn)
+    mem = MemoryService(conn)
+    bridge = Bridge(settings=settings, memory=mem)
+    asyncio.run(bridge.run_with_signals())
 
 
 def _write_default_config(path: Path, apps_root: Path, port: int) -> None:
@@ -27,19 +52,43 @@ def _write_default_config(path: Path, apps_root: Path, port: int) -> None:
 @app.command()
 def start() -> None:
     """Boot ergo + bridge in foreground."""
-    console.print("[stub] start")
+    settings = load_settings()
+    settings.run_dir.mkdir(parents=True, exist_ok=True)
+    settings.pid_file.write_text(str(os.getpid()), encoding="utf-8")
+    try:
+        _launch_bridge_blocking(settings)
+    except Exception:
+        if settings.pid_file.exists():
+            settings.pid_file.unlink()
+        raise
 
 
 @app.command()
 def stop() -> None:
-    """Send save_summary to active sessions, terminate ergo + bridge."""
-    console.print("[stub] stop")
+    """Stop a running myorch process via PID file."""
+    settings = load_settings()
+    if not settings.pid_file.exists():
+        console.print("not running")
+        return
+    pid = int(settings.pid_file.read_text(encoding="utf-8").strip())
+    os.kill(pid, _signal.SIGTERM)
+    settings.pid_file.unlink()
+    console.print(f"sent SIGTERM to {pid}")
 
 
 @app.command()
 def status() -> None:
     """Show component + session status."""
-    console.print("[stub] status")
+    settings = load_settings()
+    table = Table(title="myorch status")
+    table.add_column("component")
+    table.add_column("state")
+    if settings.pid_file.exists():
+        pid = settings.pid_file.read_text(encoding="utf-8").strip()
+        table.add_row("bridge", f"running (pid={pid})" if _pid_alive(int(pid)) else "stale pidfile")
+    else:
+        table.add_row("bridge", "not running")
+    console.print(table)
 
 
 @app.command()
