@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from myorch.db import connect, init_schema
+from irclaude.db import connect, init_schema
 
 
 def _setup(tmp_path: Path):

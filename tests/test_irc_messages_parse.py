@@ -1,6 +1,6 @@
 import pytest
 
-from myorch.irc.messages import Message, parse_line
+from irclaude.irc.messages import Message, parse_line
 
 
 def test_parse_simple_privmsg():
@@ -19,9 +19,9 @@ def test_parse_with_prefix_and_trailing():
 
 
 def test_parse_message_tags():
-    line = "@+myorch.kind=text;+myorch.session-id=abc PRIVMSG #foo :hi"
+    line = "@+irclaude.kind=text;+irclaude.session-id=abc PRIVMSG #foo :hi"
     msg = parse_line(line)
-    assert msg.tags == {"+myorch.kind": "text", "+myorch.session-id": "abc"}
+    assert msg.tags == {"+irclaude.kind": "text", "+irclaude.session-id": "abc"}
     assert msg.command == "PRIVMSG"
     assert msg.params == ["#foo", "hi"]
 

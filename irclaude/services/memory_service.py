@@ -3,7 +3,7 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
-from myorch.models import Decision, Project, Recall, RecallHit, Session, SessionBrief, SessionStatus
+from irclaude.models import Decision, Project, Recall, RecallHit, Session, SessionBrief, SessionStatus
 
 
 def _row_to_project(row: sqlite3.Row) -> Project:

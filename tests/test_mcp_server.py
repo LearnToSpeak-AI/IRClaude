@@ -3,10 +3,10 @@ from pathlib import Path
 
 import pytest
 
-from myorch.db import connect, init_schema
-from myorch.mcp_server import McpContext, build_context
-from myorch.models import Decision, Project, Recall
-from myorch.services.memory_service import MemoryService
+from irclaude.db import connect, init_schema
+from irclaude.mcp_server import McpContext, build_context
+from irclaude.models import Decision, Project, Recall
+from irclaude.services.memory_service import MemoryService
 
 
 @pytest.fixture
@@ -16,8 +16,8 @@ def ctx(tmp_path: Path, monkeypatch) -> McpContext:
     init_schema(conn)
     m = MemoryService(conn)
     p = m.upsert_project(Project(name="alpha", path="/tmp/alpha"))
-    monkeypatch.setenv("MYORCH_DB", str(db))
-    monkeypatch.setenv("MYORCH_PROJECT", "alpha")
+    monkeypatch.setenv("IRCLAUDE_DB", str(db))
+    monkeypatch.setenv("IRCLAUDE_PROJECT", "alpha")
     return build_context()
 
 
@@ -26,9 +26,9 @@ def test_build_context_resolves_project_from_env(ctx: McpContext):
 
 
 def test_build_context_raises_when_env_missing(tmp_path: Path, monkeypatch):
-    monkeypatch.delenv("MYORCH_PROJECT", raising=False)
-    monkeypatch.setenv("MYORCH_DB", str(tmp_path / "t.db"))
-    with pytest.raises(RuntimeError, match="MYORCH_PROJECT"):
+    monkeypatch.delenv("IRCLAUDE_PROJECT", raising=False)
+    monkeypatch.setenv("IRCLAUDE_DB", str(tmp_path / "t.db"))
+    with pytest.raises(RuntimeError, match="IRCLAUDE_PROJECT"):
         build_context()
 
 

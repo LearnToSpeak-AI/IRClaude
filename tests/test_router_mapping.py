@@ -1,7 +1,7 @@
-from myorch.bridge.router import ChannelRouter, project_to_channel
-from myorch.db import connect, init_schema
-from myorch.models import Project
-from myorch.services.memory_service import MemoryService
+from irclaude.bridge.router import ChannelRouter, project_to_channel
+from irclaude.db import connect, init_schema
+from irclaude.models import Project
+from irclaude.services.memory_service import MemoryService
 
 
 def _memory(tmp_path):

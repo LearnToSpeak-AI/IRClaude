@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from myorch.bridge.event_translator import classify_agent_events, translate
+from irclaude.bridge.event_translator import classify_agent_events, translate
 
 
 def _events():
@@ -21,8 +21,8 @@ def test_translate_with_subagent_tag_emits_agent_msg():
     events = _events()
     sub_event = next(e for e in events if "subagent" in e)
     msgs = translate(sub_event, channel="#p", session_id="s", turn_id=1, agent_nick="explore-1")
-    assert msgs[0].tags["+myorch.kind"] == "agent-msg"
-    assert msgs[0].tags["+myorch.agent"] == "explore-1"
+    assert msgs[0].tags["+irclaude.kind"] == "agent-msg"
+    assert msgs[0].tags["+irclaude.agent"] == "explore-1"
     assert msgs[0].params[1] == "found 3 files"
 
 
@@ -32,4 +32,4 @@ def test_translate_without_agent_nick_emits_text():
         e for e in events if e["type"] == "assistant" and "subagent" not in e
     )
     msgs = translate(main_event, channel="#p", session_id="s", turn_id=1)
-    assert msgs[0].tags["+myorch.kind"] == "text"
+    assert msgs[0].tags["+irclaude.kind"] == "text"

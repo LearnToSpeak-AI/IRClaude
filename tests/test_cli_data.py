@@ -2,10 +2,10 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from myorch.cli import app
-from myorch.db import connect, init_schema
-from myorch.models import Decision, Project, Recall
-from myorch.services.memory_service import MemoryService
+from irclaude.cli import app
+from irclaude.db import connect, init_schema
+from irclaude.models import Decision, Project, Recall
+from irclaude.services.memory_service import MemoryService
 
 
 runner = CliRunner()
@@ -13,8 +13,8 @@ runner = CliRunner()
 
 def _seed(monkeypatch, tmp_path: Path) -> None:
     data = tmp_path / "d"; data.mkdir()
-    monkeypatch.setenv("MYORCH_DATA_DIR", str(data))
-    monkeypatch.setenv("MYORCH_APPS_ROOT", str(tmp_path / "apps"))
+    monkeypatch.setenv("IRCLAUDE_DATA_DIR", str(data))
+    monkeypatch.setenv("IRCLAUDE_APPS_ROOT", str(tmp_path / "apps"))
     conn = connect(data / "data.db"); init_schema(conn)
     mem = MemoryService(conn)
     proj = mem.upsert_project(Project(name="Speaking MCP", path=str(tmp_path / "apps" / "speakingmcp")))
@@ -56,8 +56,8 @@ def test_decisions_unknown_project_returns_nonzero(monkeypatch, tmp_path):
 def test_scan_imports_new_dirs(monkeypatch, tmp_path):
     data = tmp_path / "d"; data.mkdir()
     apps = tmp_path / "apps"; (apps / "foo").mkdir(parents=True)
-    monkeypatch.setenv("MYORCH_DATA_DIR", str(data))
-    monkeypatch.setenv("MYORCH_APPS_ROOT", str(apps))
+    monkeypatch.setenv("IRCLAUDE_DATA_DIR", str(data))
+    monkeypatch.setenv("IRCLAUDE_APPS_ROOT", str(apps))
     result = runner.invoke(app, ["scan"])
     assert result.exit_code == 0
     assert "foo" in result.stdout.lower() or "1" in result.stdout

@@ -1,5 +1,5 @@
-from myorch.bridge.codeblock import CodeBlockBuffer
-from myorch.irc.messages import parse_line
+from irclaude.bridge.codeblock import CodeBlockBuffer
+from irclaude.irc.messages import parse_line
 
 
 def test_plain_text_passes_through():
@@ -9,7 +9,7 @@ def test_plain_text_passes_through():
     assert len(out) == 1
     msg = parse_line(out[0])
     assert msg.params[1] == "Hello world."
-    assert msg.tags["+myorch.kind"] == "text"
+    assert msg.tags["+irclaude.kind"] == "text"
 
 
 def test_multiline_text_uses_multiline_batch():
@@ -30,7 +30,7 @@ def test_python_fenced_block_emits_codeblock_batch():
     out += buf.flush()
     parsed = [parse_line(l) for l in out]
     open_batches = [p for p in parsed if p.command == "BATCH" and p.params[0].startswith("+")]
-    assert any(p.tags.get("+myorch.codeblock") == "python" for p in open_batches)
+    assert any(p.tags.get("+irclaude.codeblock") == "python" for p in open_batches)
     code_lines = [
         p.params[1]
         for p in parsed
@@ -41,7 +41,7 @@ def test_python_fenced_block_emits_codeblock_batch():
         p.params[1]
         for p in parsed
         if p.command == "PRIVMSG"
-        and p.tags.get("+myorch.kind") == "text"
+        and p.tags.get("+irclaude.kind") == "text"
         and not p.tags.get("batch")
     ]
     assert "intro" in text_lines
@@ -53,7 +53,7 @@ def test_unlanguaged_fence_uses_text_lang():
     out = buf.feed("```\nA\nB\n```")
     out += buf.flush()
     parsed = [parse_line(l) for l in out]
-    assert any(p.tags.get("+myorch.codeblock") == "text" for p in parsed if p.command == "BATCH")
+    assert any(p.tags.get("+irclaude.codeblock") == "text" for p in parsed if p.command == "BATCH")
 
 
 def test_unterminated_fence_at_eof_still_flushes():

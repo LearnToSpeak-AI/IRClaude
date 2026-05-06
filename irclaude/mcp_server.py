@@ -1,10 +1,10 @@
 """MCP server (stdio mode) spawned by `claude` per session.
 
-Reads MYORCH_DB and MYORCH_PROJECT from env. Exposes 6 tools:
+Reads IRCLAUDE_DB and IRCLAUDE_PROJECT from env. Exposes 6 tools:
   recall, list_recent_sessions, list_decisions, save_decision, save_recall, save_summary
 
 The active session id is written by Session Manager to a sidecar file
-(~/.myorch/run/<project>.session). save_summary reads that file at call time.
+(~/.irclaude/run/<project>.session). save_summary reads that file at call time.
 """
 from __future__ import annotations
 
@@ -12,9 +12,9 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from myorch.db import connect, init_schema
-from myorch.models import Decision, Project, Recall, RecallHit, SessionBrief
-from myorch.services.memory_service import MemoryService
+from irclaude.db import connect, init_schema
+from irclaude.models import Decision, Project, Recall, RecallHit, SessionBrief
+from irclaude.services.memory_service import MemoryService
 
 
 @dataclass
@@ -27,8 +27,8 @@ class McpContext:
         if self.active_session_id is not None:
             return self.active_session_id
         sidecar = Path(os.environ.get(
-            "MYORCH_SESSION_FILE",
-            str(Path.home() / ".myorch" / "run" / f"{self.project.name}.session"),
+            "IRCLAUDE_SESSION_FILE",
+            str(Path.home() / ".irclaude" / "run" / f"{self.project.name}.session"),
         ))
         if sidecar.exists():
             try:
@@ -68,12 +68,12 @@ class McpContext:
 
 
 def build_context() -> McpContext:
-    db_path = os.environ.get("MYORCH_DB")
-    project_name = os.environ.get("MYORCH_PROJECT")
+    db_path = os.environ.get("IRCLAUDE_DB")
+    project_name = os.environ.get("IRCLAUDE_PROJECT")
     if not db_path:
-        raise RuntimeError("MYORCH_DB env var not set")
+        raise RuntimeError("IRCLAUDE_DB env var not set")
     if not project_name:
-        raise RuntimeError("MYORCH_PROJECT env var not set")
+        raise RuntimeError("IRCLAUDE_PROJECT env var not set")
     conn = connect(Path(db_path))
     init_schema(conn)
     memory = MemoryService(conn)
@@ -87,7 +87,7 @@ def main() -> None:
     from mcp.server.fastmcp import FastMCP
 
     ctx = build_context()
-    mcp = FastMCP("myorch-memory")
+    mcp = FastMCP("irclaude-memory")
 
     @mcp.tool()
     def recall(query: str, limit: int = 10) -> list[dict]:

@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from myorch.db import connect, init_schema
-from myorch.models import Decision, Project, Recall
-from myorch.services.memory_service import MemoryService
+from irclaude.db import connect, init_schema
+from irclaude.models import Decision, Project, Recall
+from irclaude.services.memory_service import MemoryService
 
 
 @pytest.fixture

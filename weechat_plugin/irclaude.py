@@ -1,9 +1,9 @@
-"""WeeChat plugin for myorch — render IRCv3 +myorch.* tagged events."""
+"""WeeChat plugin for irclaude — render IRCv3 +irclaude.* tagged events."""
 
 import weechat
 
 
-PLUGIN_NAME = "myorch"
+PLUGIN_NAME = "irclaude"
 PLUGIN_VERSION = "2.0.0"
 
 
@@ -67,8 +67,8 @@ def _close_batch(batch_id: str) -> None:
     info = _BATCHES.pop(batch_id, None)
     if info is None:
         return
-    if info["tags"].get("+myorch.codeblock"):
-        lang = info["tags"]["+myorch.codeblock"]
+    if info["tags"].get("+irclaude.codeblock"):
+        lang = info["tags"]["+irclaude.codeblock"]
         buf_name = _next_code_buffer_name(info["channel"])
         weechat.buffer_new(buf_name, "", "", "", "")
         weechat.buffer_set(buf_name, "type", "free")
@@ -107,13 +107,13 @@ def cb_modifier_privmsg(data, modifier, modifier_data, line):
     chan = parsed.get("channel") or _STATUS["channel"]
     if chan and chan.startswith("#"):
         _STATUS["channel"] = chan
-    if "+myorch.turn-id" in tags:
+    if "+irclaude.turn-id" in tags:
         try:
-            _STATUS["turn"] = int(tags["+myorch.turn-id"])
+            _STATUS["turn"] = int(tags["+irclaude.turn-id"])
         except ValueError:
             pass
-    if "+myorch.session-id" in tags:
-        _STATUS["session"] = tags["+myorch.session-id"]
+    if "+irclaude.session-id" in tags:
+        _STATUS["session"] = tags["+irclaude.session-id"]
 
     if cmd == "BATCH":
         body = line.split()
@@ -134,7 +134,7 @@ def cb_modifier_privmsg(data, modifier, modifier_data, line):
     if cmd == "PRIVMSG" and tags.get("batch"):
         batch_id = tags["batch"]
         info = _BATCHES.get(batch_id)
-        if info and info["tags"].get("+myorch.codeblock"):
+        if info and info["tags"].get("+irclaude.codeblock"):
             text = parsed.get("arguments", "")
             _append_batch_line(batch_id, text)
             return ""
@@ -143,10 +143,10 @@ def cb_modifier_privmsg(data, modifier, modifier_data, line):
     return line
 
 
-def cb_command_myorch(data, buffer, args):
+def cb_command_irclaude(data, buffer, args):
     parts = args.split()
     if not parts:
-        weechat.prnt(buffer, "/myorch projects|recall|search|decisions|close|agents")
+        weechat.prnt(buffer, "/irclaude projects|recall|search|decisions|close|agents")
         return weechat.WEECHAT_RC_OK()
     sub = parts[0]
     rest = " ".join(parts[1:])
@@ -164,20 +164,20 @@ weechat.register(
     "Ivan Pena",
     PLUGIN_VERSION,
     "MIT",
-    "MyOrchestrator IRC bridge plugin",
+    "IRClaude IRC bridge plugin",
     "shutdown_cb",
     "",
 )
 weechat.hook_modifier("irc_in2_privmsg", "cb_modifier_privmsg", "")
 weechat.hook_modifier("irc_in2_batch", "cb_modifier_privmsg", "")
-weechat.bar_item_new("myorch_status", "cb_bar_status", "")
+weechat.bar_item_new("irclaude_status", "cb_bar_status", "")
 weechat.hook_signal("*,irc_in2_join", "cb_signal_join", "")
 weechat.hook_command(
-    "myorch",
-    "myorch helpers",
+    "irclaude",
+    "irclaude helpers",
     "[projects|recall|search|decisions|close|agents] <args>",
     "subcommand args",
     "",
-    "cb_command_myorch",
+    "cb_command_irclaude",
     "",
 )

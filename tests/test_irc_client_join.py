@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from myorch.bridge.ergo_config import generate_ergo_config
-from myorch.bridge.server import ErgoServer
-from myorch.irc.client import IrcClient
+from irclaude.bridge.ergo_config import generate_ergo_config
+from irclaude.bridge.server import ErgoServer
+from irclaude.irc.client import IrcClient
 
 
 pytestmark = pytest.mark.skipif(
@@ -40,7 +40,7 @@ async def test_join_emits_join_353_366(running_ergo):
     await client.expect("001")
     try:
         joined = []
-        await client.join("#myorch-test")
+        await client.join("#irclaude-test")
         deadline = asyncio.get_event_loop().time() + 4.0
         while {("JOIN",), ("353",), ("366",)} - {(c,) for c in joined}:
             if asyncio.get_event_loop().time() > deadline:

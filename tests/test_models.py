@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from myorch.models import Project, Session, Decision, Recall, SessionStatus
+from irclaude.models import Project, Session, Decision, Recall, SessionStatus
 
 
 def test_project_minimum_required():

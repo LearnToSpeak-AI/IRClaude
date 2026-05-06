@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from myorch.bridge.ergo_config import generate_ergo_config
-from myorch.bridge.server import ErgoServer
-from myorch.irc.client import IrcClient
+from irclaude.bridge.ergo_config import generate_ergo_config
+from irclaude.bridge.server import ErgoServer
+from irclaude.irc.client import IrcClient
 
 
 pytestmark = pytest.mark.skipif(

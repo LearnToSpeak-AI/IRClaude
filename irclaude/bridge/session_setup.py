@@ -4,11 +4,11 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-from myorch.bridge.claude_runner import _claude_conversation_exists
-from myorch.config import Settings
-from myorch.digest import generate_digest
-from myorch.models import Project
-from myorch.services.memory_service import MemoryService
+from irclaude.bridge.claude_runner import _claude_conversation_exists
+from irclaude.config import Settings
+from irclaude.digest import generate_digest
+from irclaude.models import Project
+from irclaude.services.memory_service import MemoryService
 
 
 @dataclass
@@ -22,7 +22,7 @@ class SessionContext:
 
 
 def _write_digest(project: Project, memory: MemoryService) -> Path:
-    target_dir = Path(project.path) / ".myorch"
+    target_dir = Path(project.path) / ".irclaude"
     target_dir.mkdir(parents=True, exist_ok=True)
     digest_path = target_dir / "CLAUDE.context.md"
     body = generate_digest(memory, project.id)
@@ -35,12 +35,12 @@ def _write_mcp_config(project: Project, settings: Settings) -> Path:
     mcp_path = settings.run_dir / f"{project.name}.mcp.json"
     payload = {
         "mcpServers": {
-            "myorch": {
+            "irclaude": {
                 "command": sys.executable,
-                "args": ["-m", "myorch.mcp_server"],
+                "args": ["-m", "irclaude.mcp_server"],
                 "env": {
-                    "MYORCH_DATA_DIR": str(settings.data_dir),
-                    "MYORCH_PROJECT_ID": str(project.id),
+                    "IRCLAUDE_DATA_DIR": str(settings.data_dir),
+                    "IRCLAUDE_PROJECT_ID": str(project.id),
                 },
             }
         }

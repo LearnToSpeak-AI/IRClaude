@@ -3,7 +3,7 @@ import shutil
 import sys
 import time
 
-from myorch.config import Settings
+from irclaude.config import Settings
 
 
 def ensure_mcp_config(settings: Settings) -> None:
@@ -13,12 +13,12 @@ def ensure_mcp_config(settings: Settings) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     config = {
         "mcpServers": {
-            "myorch-memory": {
+            "irclaude-memory": {
                 "command": sys.executable,
-                "args": ["-m", "myorch.mcp_server"],
+                "args": ["-m", "irclaude.mcp_server"],
                 "env": {
-                    "MYORCH_DB": str(settings.db_path),
-                    "MYORCH_PROJECT": "<set per-session by SessionManager>",
+                    "IRCLAUDE_DB": str(settings.db_path),
+                    "IRCLAUDE_PROJECT": "<set per-session by SessionManager>",
                 },
             }
         }

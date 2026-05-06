@@ -1,6 +1,6 @@
 import secrets
 
-from myorch.irc.messages import Message
+from irclaude.irc.messages import Message
 
 
 def new_batch_id() -> str:

@@ -1,6 +1,6 @@
 import re
 
-from myorch.irc.protocol import encode_batch, encode_multiline, new_batch_id
+from irclaude.irc.protocol import encode_batch, encode_multiline, new_batch_id
 
 
 _FENCE = re.compile(r"^```(\S*)\s*$")
@@ -9,7 +9,7 @@ _FENCE = re.compile(r"^```(\S*)\s*$")
 class CodeBlockBuffer:
     """Stateful buffer for streamed text to tagged IRC lines.
 
-    Detects fenced code blocks across feed() calls and emits BATCH +myorch.codeblock=<lang>
+    Detects fenced code blocks across feed() calls and emits BATCH +irclaude.codeblock=<lang>
     sequences for them, while plain text passes through (multiline becomes a draft/multiline batch).
     """
 
@@ -25,23 +25,23 @@ class CodeBlockBuffer:
 
     def _common_tags(self) -> dict[str, str]:
         return {
-            "+myorch.session-id": self.session_id,
-            "+myorch.turn-id": str(self.turn_id),
+            "+irclaude.session-id": self.session_id,
+            "+irclaude.turn-id": str(self.turn_id),
         }
 
     def _emit_text_block(self, text: str) -> list[str]:
         if not text:
             return []
         tags = self._common_tags()
-        tags["+myorch.kind"] = "text"
+        tags["+irclaude.kind"] = "text"
         return encode_multiline(target=self.channel, content=text, tags=tags)
 
     def _emit_code_block(self, lang: str, lines: list[str]) -> list[str]:
         if not lines:
             return []
         tags = self._common_tags()
-        tags["+myorch.kind"] = "code"
-        tags["+myorch.codeblock"] = lang
+        tags["+irclaude.kind"] = "code"
+        tags["+irclaude.codeblock"] = lang
         return encode_batch(
             batch_id=new_batch_id(),
             type_="draft/multiline",

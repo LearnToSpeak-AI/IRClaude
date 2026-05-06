@@ -1,8 +1,8 @@
 import asyncio
 from typing import Callable
 
-from myorch.irc.client import IrcClient
-from myorch.irc.messages import Message
+from irclaude.irc.client import IrcClient
+from irclaude.irc.messages import Message
 
 
 class AgentManager:

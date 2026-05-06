@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from myorch.services.project_registry import detect_project_type
+from irclaude.services.project_registry import detect_project_type
 
 
 def _make(tmp_path: Path, name: str, files: list[str]) -> Path:

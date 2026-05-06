@@ -7,22 +7,22 @@ from pathlib import Path
 def test_mcp_server_responds_to_initialize(tmp_path: Path):
     """End-to-end: spawn the MCP server as subprocess, send initialize, expect response."""
     db = tmp_path / "t.db"
-    from myorch.db import connect, init_schema
-    from myorch.models import Project
-    from myorch.services.memory_service import MemoryService
+    from irclaude.db import connect, init_schema
+    from irclaude.models import Project
+    from irclaude.services.memory_service import MemoryService
     conn = connect(db)
     init_schema(conn)
     MemoryService(conn).upsert_project(Project(name="alpha", path="/tmp/alpha"))
     conn.close()
 
     env = {
-        "MYORCH_DB": str(db),
-        "MYORCH_PROJECT": "alpha",
+        "IRCLAUDE_DB": str(db),
+        "IRCLAUDE_PROJECT": "alpha",
         "PATH": "/usr/bin:/bin",
         "PYTHONPATH": str(Path.cwd()),
     }
     proc = subprocess.Popen(
-        [sys.executable, "-m", "myorch.mcp_server"],
+        [sys.executable, "-m", "irclaude.mcp_server"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         env=env, text=True,
     )

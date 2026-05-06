@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from myorch.bridge.ergo_fetch import download_ergo, parse_version_pin
+from irclaude.bridge.ergo_fetch import download_ergo, parse_version_pin
 
 
 def _build_fake_tarball(binary_bytes: bytes) -> bytes:
@@ -47,7 +47,7 @@ def test_download_ergo_extracts_binary(tmp_path: Path, monkeypatch):
         return _R()
 
     monkeypatch.setattr(
-        "myorch.bridge.ergo_fetch.urlopen", fake_urlopen, raising=False
+        "irclaude.bridge.ergo_fetch.urlopen", fake_urlopen, raising=False
     )
 
     target = tmp_path / "bin"
@@ -68,7 +68,7 @@ def test_download_ergo_skips_when_already_present(tmp_path: Path, monkeypatch):
         raise AssertionError("network must not be hit")
 
     monkeypatch.setattr(
-        "myorch.bridge.ergo_fetch.urlopen", fake_urlopen, raising=False
+        "irclaude.bridge.ergo_fetch.urlopen", fake_urlopen, raising=False
     )
     path = download_ergo(target_dir=target, version="2.16.0", expected_sha256=sha)
     assert path.read_bytes() == b"already here"
@@ -92,7 +92,7 @@ def test_download_ergo_rejects_bad_checksum(tmp_path: Path, monkeypatch):
         return _R()
 
     monkeypatch.setattr(
-        "myorch.bridge.ergo_fetch.urlopen", fake_urlopen, raising=False
+        "irclaude.bridge.ergo_fetch.urlopen", fake_urlopen, raising=False
     )
     with pytest.raises(ValueError, match="sha256 mismatch"):
         download_ergo(

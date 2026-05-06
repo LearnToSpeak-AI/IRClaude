@@ -1,6 +1,6 @@
 import pytest
 
-from myorch.bridge.core import Bridge
+from irclaude.bridge.core import Bridge
 
 
 def test_bang_command_routes_to_control_handler():

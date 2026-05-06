@@ -1,6 +1,6 @@
-# WeeChat plugin — myorch
+# WeeChat plugin — irclaude
 
-Symlink `myorch.py` into `~/.local/share/weechat/python/autoload/` (XDG default)
-or run `myorch setup-weechat` to do it automatically. Then in WeeChat:
+Symlink `irclaude.py` into `~/.local/share/weechat/python/autoload/` (XDG default)
+or run `irclaude setup-weechat` to do it automatically. Then in WeeChat:
 
-    /python load myorch.py
+    /python load irclaude.py

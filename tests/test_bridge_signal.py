@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from myorch.bridge import Bridge
-from myorch.bridge.ergo_config import generate_ergo_config
-from myorch.bridge.server import ErgoServer
-from myorch.config import Settings
-from myorch.db import connect, init_schema
-from myorch.services.memory_service import MemoryService
+from irclaude.bridge import Bridge
+from irclaude.bridge.ergo_config import generate_ergo_config
+from irclaude.bridge.server import ErgoServer
+from irclaude.config import Settings
+from irclaude.db import connect, init_schema
+from irclaude.services.memory_service import MemoryService
 
 
 pytestmark = pytest.mark.skipif(

@@ -7,7 +7,7 @@ __pycache__/
 .ruff_cache/
 
 # Local runtime
-.myorch/
+.irclaude/
 local_data/
 *.db
 *.db-shm

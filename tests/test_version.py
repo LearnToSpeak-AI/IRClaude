@@ -1,7 +1,7 @@
 from typer.testing import CliRunner
 
-from myorch.__about__ import __version__
-from myorch.cli import app
+from irclaude.__about__ import __version__
+from irclaude.cli import app
 
 
 runner = CliRunner()

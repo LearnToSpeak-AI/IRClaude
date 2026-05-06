@@ -1,13 +1,13 @@
 import pytest
 
-from myorch.irc.messages import Message, parse_line
+from irclaude.irc.messages import Message, parse_line
 
 
 _FIXTURES = [
     "PRIVMSG #foo :hello\r\n",
     ":nick!user@host PRIVMSG #foo :hello world\r\n",
-    "@+myorch.kind=text PRIVMSG #foo :hi\r\n",
-    "@batch=abc;+myorch.kind=code PRIVMSG #foo :    return 42\r\n",
+    "@+irclaude.kind=text PRIVMSG #foo :hi\r\n",
+    "@batch=abc;+irclaude.kind=code PRIVMSG #foo :    return 42\r\n",
     "PING :server.local\r\n",
     "JOIN #foo\r\n",
     ":server.local 001 nick :Welcome to the network nick\r\n",

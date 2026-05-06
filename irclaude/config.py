@@ -21,29 +21,29 @@ def _xdg_config_home() -> Path:
 
 
 def _default_apps_root() -> Path:
-    return Path(os.environ.get("MYORCH_APPS_ROOT", str(Path.home() / "projects")))
+    return Path(os.environ.get("IRCLAUDE_APPS_ROOT", str(Path.home() / "projects")))
 
 
 def _default_data_dir() -> Path:
-    raw = os.environ.get("MYORCH_DATA_DIR")
+    raw = os.environ.get("IRCLAUDE_DATA_DIR")
     if raw:
         return Path(raw)
-    return _xdg_data_home() / "myorch"
+    return _xdg_data_home() / "irclaude"
 
 
 def _default_config_file() -> Path:
-    raw = os.environ.get("MYORCH_CONFIG_FILE")
+    raw = os.environ.get("IRCLAUDE_CONFIG_FILE")
     if raw:
         return Path(raw)
-    return _xdg_config_home() / "myorch" / "config.toml"
+    return _xdg_config_home() / "irclaude" / "config.toml"
 
 
 class Settings(BaseModel):
     apps_root: Path = Field(default_factory=_default_apps_root)
     data_dir: Path = Field(default_factory=_default_data_dir)
     config_file: Path = Field(default_factory=_default_config_file)
-    host: str = Field(default_factory=lambda: os.environ.get("MYORCH_HOST", "127.0.0.1"))
-    port: int = Field(default_factory=lambda: int(os.environ.get("MYORCH_PORT", "6667")))
+    host: str = Field(default_factory=lambda: os.environ.get("IRCLAUDE_HOST", "127.0.0.1"))
+    port: int = Field(default_factory=lambda: int(os.environ.get("IRCLAUDE_PORT", "6667")))
 
     @property
     def db_path(self) -> Path:
@@ -75,14 +75,14 @@ class Settings(BaseModel):
 
     @property
     def pid_file(self) -> Path:
-        return self.run_dir / "myorch.pid"
+        return self.run_dir / "irclaude.pid"
 
 
 _ENV_KEYS = {
-    "apps_root": "MYORCH_APPS_ROOT",
-    "data_dir": "MYORCH_DATA_DIR",
-    "host": "MYORCH_HOST",
-    "port": "MYORCH_PORT",
+    "apps_root": "IRCLAUDE_APPS_ROOT",
+    "data_dir": "IRCLAUDE_DATA_DIR",
+    "host": "IRCLAUDE_HOST",
+    "port": "IRCLAUDE_PORT",
 }
 
 

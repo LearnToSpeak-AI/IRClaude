@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from myorch.bridge.ergo_config import generate_ergo_config
-from myorch.bridge.server import ErgoServer
+from irclaude.bridge.ergo_config import generate_ergo_config
+from irclaude.bridge.server import ErgoServer
 
 
 def _ergo_binary() -> Path | None:

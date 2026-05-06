@@ -1,4 +1,4 @@
-from myorch.services.memory_service import MemoryService
+from irclaude.services.memory_service import MemoryService
 
 MAX_DECISIONS = 5
 MAX_RECALLS = 5

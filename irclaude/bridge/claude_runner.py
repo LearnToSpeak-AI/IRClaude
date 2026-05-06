@@ -8,8 +8,8 @@ from pathlib import Path
 from pathlib import Path as _Path
 from typing import AsyncIterator
 
-from myorch.models import Project as _Project
-from myorch.services.memory_service import MemoryService as _MemoryService
+from irclaude.models import Project as _Project
+from irclaude.services.memory_service import MemoryService as _MemoryService
 
 
 @dataclass

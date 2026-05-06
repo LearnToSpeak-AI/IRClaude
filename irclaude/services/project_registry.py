@@ -1,8 +1,8 @@
 from pathlib import Path
 from typing import Any
 
-from myorch.models import Project
-from myorch.services.memory_service import MemoryService
+from irclaude.models import Project
+from irclaude.services.memory_service import MemoryService
 
 
 def detect_project_type(path: Path) -> dict[str, Any]:

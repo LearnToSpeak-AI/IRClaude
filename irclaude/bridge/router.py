@@ -4,8 +4,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Awaitable, Callable, Iterable
 
-from myorch.models import Project, SessionStatus
-from myorch.services.memory_service import MemoryService
+from irclaude.models import Project, SessionStatus
+from irclaude.services.memory_service import MemoryService
 
 RunnerFn = Callable[[str, str], Awaitable[None]]
 
@@ -22,7 +22,7 @@ _DASH_RUN = re.compile(r"-+")
 
 _SUMMARY_PROMPT_ES = (
     "Por favor guarda un resumen breve de lo que hicimos en esta sesión "
-    "usando la herramienta save_summary del MCP myorch (en español)."
+    "usando la herramienta save_summary del MCP irclaude (en español)."
 )
 
 

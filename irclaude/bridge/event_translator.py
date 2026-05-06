@@ -1,18 +1,18 @@
 from typing import Any
 
-from myorch.irc.messages import Message
+from irclaude.irc.messages import Message
 
 
 def _common_tags(session_id: str, turn_id: int) -> dict[str, str]:
     return {
-        "+myorch.session-id": session_id,
-        "+myorch.turn-id": str(turn_id),
+        "+irclaude.session-id": session_id,
+        "+irclaude.turn-id": str(turn_id),
     }
 
 
 def _privmsg(channel: str, text: str, kind: str, extra: dict[str, str], session_id: str, turn_id: int) -> Message:
     tags = _common_tags(session_id, turn_id)
-    tags["+myorch.kind"] = kind
+    tags["+irclaude.kind"] = kind
     tags.update(extra)
     return Message(command="PRIVMSG", params=[channel, text], tags=tags)
 
@@ -41,14 +41,14 @@ def translate(
             it = item.get("type")
             if it == "text":
                 kind = "agent-msg" if agent_nick else "text"
-                extra = {"+myorch.agent": agent_nick} if agent_nick else {}
+                extra = {"+irclaude.agent": agent_nick} if agent_nick else {}
                 out.append(_privmsg(channel, item.get("text", ""), kind, extra, session_id, turn_id))
             elif it == "tool_use":
                 tool = item.get("name", "?")
                 summary = f">> {tool}"
-                extra = {"+myorch.tool": tool}
+                extra = {"+irclaude.tool": tool}
                 if agent_nick:
-                    extra["+myorch.agent"] = agent_nick
+                    extra["+irclaude.agent"] = agent_nick
                 out.append(_privmsg(channel, summary, "tool-use", extra, session_id, turn_id))
         return out
     if et == "user":

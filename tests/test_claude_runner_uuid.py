@@ -1,12 +1,12 @@
 from pathlib import Path
 
-from myorch.bridge.claude_runner import (
+from irclaude.bridge.claude_runner import (
     _claude_conversation_exists,
     resolve_claude_uuid,
 )
-from myorch.db import connect, init_schema
-from myorch.models import Project
-from myorch.services.memory_service import MemoryService
+from irclaude.db import connect, init_schema
+from irclaude.models import Project
+from irclaude.services.memory_service import MemoryService
 
 
 def _memory(tmp_path):

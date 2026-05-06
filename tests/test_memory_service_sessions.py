@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from myorch.db import connect, init_schema
-from myorch.models import Project, SessionStatus
-from myorch.services.memory_service import MemoryService
+from irclaude.db import connect, init_schema
+from irclaude.models import Project, SessionStatus
+from irclaude.services.memory_service import MemoryService
 
 
 @pytest.fixture

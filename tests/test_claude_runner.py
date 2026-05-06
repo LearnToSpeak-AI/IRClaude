@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from myorch.bridge.claude_runner import ClaudeRunner
+from irclaude.bridge.claude_runner import ClaudeRunner
 
 
 @pytest.fixture

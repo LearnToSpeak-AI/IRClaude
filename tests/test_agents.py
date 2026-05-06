@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from myorch.bridge.agents import AgentManager
-from myorch.bridge.ergo_config import generate_ergo_config
-from myorch.bridge.server import ErgoServer
-from myorch.irc.client import IrcClient
-from myorch.irc.messages import Message
+from irclaude.bridge.agents import AgentManager
+from irclaude.bridge.ergo_config import generate_ergo_config
+from irclaude.bridge.server import ErgoServer
+from irclaude.irc.client import IrcClient
+from irclaude.irc.messages import Message
 
 
 pytestmark = pytest.mark.skipif(
@@ -61,7 +61,7 @@ async def test_agent_joins_and_leaves_channel(running_ergo):
     await manager.agent_say("explore-1", "#bots", Message(
         command="PRIVMSG",
         params=["#bots", "found 3 files"],
-        tags={"+myorch.kind": "agent-msg", "+myorch.agent": "explore-1"},
+        tags={"+irclaude.kind": "agent-msg", "+irclaude.agent": "explore-1"},
     ))
     seen_msg = False
     for _ in range(40):

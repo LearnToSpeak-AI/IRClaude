@@ -1,4 +1,4 @@
-from myorch.cli import app
+from irclaude.cli import app
 
 if __name__ == "__main__":
     app()

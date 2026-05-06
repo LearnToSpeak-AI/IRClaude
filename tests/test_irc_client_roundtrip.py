@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from myorch.bridge.ergo_config import generate_ergo_config
-from myorch.bridge.server import ErgoServer
-from myorch.irc.client import IrcClient
-from myorch.irc.messages import Message
+from irclaude.bridge.ergo_config import generate_ergo_config
+from irclaude.bridge.server import ErgoServer
+from irclaude.irc.client import IrcClient
+from irclaude.irc.messages import Message
 
 
 pytestmark = pytest.mark.skipif(
@@ -48,14 +48,14 @@ async def test_tagged_privmsg_roundtrip(running_ergo):
         outbound = Message(
             command="PRIVMSG",
             params=["#room", "hi from alice"],
-            tags={"+myorch.kind": "text"},
+            tags={"+irclaude.kind": "text"},
         )
         await a.send(outbound)
         for _ in range(50):
             msg = await asyncio.wait_for(b.recv(), timeout=2.0)
             if msg.command == "PRIVMSG" and msg.params[0] == "#room":
                 assert msg.params[1] == "hi from alice"
-                assert msg.tags.get("+myorch.kind") == "text"
+                assert msg.tags.get("+irclaude.kind") == "text"
                 break
         else:
             pytest.fail("never received PRIVMSG")

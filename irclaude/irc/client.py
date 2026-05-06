@@ -2,7 +2,7 @@ import asyncio
 import contextlib
 from typing import AsyncIterator
 
-from myorch.irc.messages import Message, parse_line
+from irclaude.irc.messages import Message, parse_line
 
 _REQUESTED_CAPS = (
     "message-tags",

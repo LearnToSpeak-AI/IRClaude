@@ -1,10 +1,10 @@
 import json
 
-from myorch.bridge.session_setup import SessionContext, prepare_session
-from myorch.config import Settings
-from myorch.db import connect, init_schema
-from myorch.models import Project, Recall
-from myorch.services.memory_service import MemoryService
+from irclaude.bridge.session_setup import SessionContext, prepare_session
+from irclaude.config import Settings
+from irclaude.db import connect, init_schema
+from irclaude.models import Project, Recall
+from irclaude.services.memory_service import MemoryService
 
 
 def _settings(tmp_path):
@@ -31,7 +31,7 @@ def test_prepare_session_writes_digest_under_project(tmp_path):
     ctx = prepare_session(project=proj, memory=mem, settings=settings)
     assert isinstance(ctx, SessionContext)
 
-    digest_path = proj_path / ".myorch" / "CLAUDE.context.md"
+    digest_path = proj_path / ".irclaude" / "CLAUDE.context.md"
     assert digest_path.exists()
     body = digest_path.read_text(encoding="utf-8")
     assert "key fact" in body or "Foo" in body
@@ -50,11 +50,11 @@ def test_prepare_session_writes_per_project_mcp_json(tmp_path):
     assert mcp_path.exists()
     data = json.loads(mcp_path.read_text(encoding="utf-8"))
     assert "mcpServers" in data
-    assert "myorch" in data["mcpServers"]
-    server = data["mcpServers"]["myorch"]
+    assert "irclaude" in data["mcpServers"]
+    server = data["mcpServers"]["irclaude"]
     assert server["command"]
-    assert "MYORCH_DATA_DIR" in server.get("env", {})
-    assert server["env"]["MYORCH_PROJECT_ID"] == str(proj.id)
+    assert "IRCLAUDE_DATA_DIR" in server.get("env", {})
+    assert server["env"]["IRCLAUDE_PROJECT_ID"] == str(proj.id)
 
 
 def test_prepare_session_returns_paths_in_context(tmp_path):

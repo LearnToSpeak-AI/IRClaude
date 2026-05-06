@@ -11,22 +11,22 @@ def plugin(monkeypatch):
     weechat_stub.reset()
     monkeypatch.setitem(sys.modules, "weechat", weechat_stub)
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "weechat_plugin"))
-    sys.modules.pop("myorch", None)
-    import myorch as plugin
+    sys.modules.pop("irclaude", None)
+    import irclaude as plugin
     return weechat_stub, plugin
 
 
 def _send_batch(stub, channel: str, lang: str, lines: list[str]) -> None:
     open_line = (
-        f"@batch=ABC;+myorch.kind=code;+myorch.codeblock={lang} "
+        f"@batch=ABC;+irclaude.kind=code;+irclaude.codeblock={lang} "
         f":server.local BATCH +ABC draft/multiline {channel}"
     )
-    stub.call_modifier("irc_in2_privmsg", "server.irc.myorch", open_line)
+    stub.call_modifier("irc_in2_privmsg", "server.irc.irclaude", open_line)
     for line in lines:
         wire = f"@batch=ABC :n!u@h PRIVMSG {channel} :{line}"
-        stub.call_modifier("irc_in2_privmsg", "server.irc.myorch", wire)
+        stub.call_modifier("irc_in2_privmsg", "server.irc.irclaude", wire)
     close_line = ":server.local BATCH -ABC"
-    stub.call_modifier("irc_in2_privmsg", "server.irc.myorch", close_line)
+    stub.call_modifier("irc_in2_privmsg", "server.irc.irclaude", close_line)
 
 
 def test_codeblock_opens_free_buffer_with_lines(plugin):

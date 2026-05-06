@@ -1,6 +1,6 @@
 import yaml
 
-from myorch.bridge.ergo_config import generate_ergo_config
+from irclaude.bridge.ergo_config import generate_ergo_config
 
 
 def test_generated_config_binds_loopback_and_port():
@@ -15,7 +15,7 @@ def test_generated_config_enables_required_caps():
     text = generate_ergo_config(host="127.0.0.1", port=6667)
     data = yaml.safe_load(text)
     assert data["server"]["compatibility"]["allow-truncation"] is False
-    assert data["server"]["name"] == "myorch.local"
+    assert data["server"]["name"] == "irclaude.local"
     assert data["server"]["enable-rfc3339-time"] is True
     assert data["server"]["casemapping"] == "ascii"
 

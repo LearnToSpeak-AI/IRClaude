@@ -1,4 +1,4 @@
-from myorch.bridge.markdown import markdown_to_irc
+from irclaude.bridge.markdown import markdown_to_irc
 
 
 def test_bold_wraps_text_with_ctcp_bold():

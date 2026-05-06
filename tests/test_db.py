@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from myorch.db import connect, init_schema
+from irclaude.db import connect, init_schema
 
 
 def test_connect_creates_file_and_enables_wal(tmp_path: Path):

@@ -3,16 +3,16 @@ import contextlib
 import signal as _signal
 from pathlib import Path
 
-from myorch.bridge.agents import AgentManager
-from myorch.bridge.claude_runner import ClaudeRunner
-from myorch.bridge.codeblock import CodeBlockBuffer
-from myorch.bridge.event_translator import classify_agent_events, translate
-from myorch.bridge.router import ChannelRouter
-from myorch.bridge.session_setup import prepare_session
-from myorch.config import Settings
-from myorch.irc.client import IrcClient
-from myorch.irc.messages import Message
-from myorch.services.memory_service import MemoryService
+from irclaude.bridge.agents import AgentManager
+from irclaude.bridge.claude_runner import ClaudeRunner
+from irclaude.bridge.codeblock import CodeBlockBuffer
+from irclaude.bridge.event_translator import classify_agent_events, translate
+from irclaude.bridge.router import ChannelRouter
+from irclaude.bridge.session_setup import prepare_session
+from irclaude.config import Settings
+from irclaude.irc.client import IrcClient
+from irclaude.irc.messages import Message
+from irclaude.services.memory_service import MemoryService
 
 BOT_NICK = "claude"
 
@@ -103,7 +103,7 @@ class Bridge:
                     )
                     for m in msgs:
                         text = m.params[1] if len(m.params) > 1 else ""
-                        if m.tags.get("+myorch.kind") in {"text", "agent-msg"}:
+                        if m.tags.get("+irclaude.kind") in {"text", "agent-msg"}:
                             for line in buffer.feed(text + "\n"):
                                 await self._send_raw(line)
                         else:

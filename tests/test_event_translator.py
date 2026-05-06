@@ -1,9 +1,9 @@
-from myorch.bridge.event_translator import translate
-from myorch.irc.messages import Message
+from irclaude.bridge.event_translator import translate
+from irclaude.irc.messages import Message
 
 
 def _kinds(msgs: list[Message]) -> list[str]:
-    return [m.tags.get("+myorch.kind", "") for m in msgs]
+    return [m.tags.get("+irclaude.kind", "") for m in msgs]
 
 
 def test_translate_assistant_text_emits_kind_text():
@@ -15,9 +15,9 @@ def test_translate_assistant_text_emits_kind_text():
     assert len(msgs) == 1
     assert msgs[0].command == "PRIVMSG"
     assert msgs[0].params == ["#proj", "It defines foo."]
-    assert msgs[0].tags["+myorch.kind"] == "text"
-    assert msgs[0].tags["+myorch.session-id"] == "abc"
-    assert msgs[0].tags["+myorch.turn-id"] == "2"
+    assert msgs[0].tags["+irclaude.kind"] == "text"
+    assert msgs[0].tags["+irclaude.session-id"] == "abc"
+    assert msgs[0].tags["+irclaude.turn-id"] == "2"
 
 
 def test_translate_tool_use_emits_status_with_tool_tag():
@@ -31,8 +31,8 @@ def test_translate_tool_use_emits_status_with_tool_tag():
     }
     msgs = translate(event, channel="#proj", session_id="abc", turn_id=1)
     assert len(msgs) == 1
-    assert msgs[0].tags["+myorch.kind"] == "tool-use"
-    assert msgs[0].tags["+myorch.tool"] == "Bash"
+    assert msgs[0].tags["+irclaude.kind"] == "tool-use"
+    assert msgs[0].tags["+irclaude.tool"] == "Bash"
     assert "Bash" in msgs[0].params[1]
 
 

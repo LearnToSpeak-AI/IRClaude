@@ -6,15 +6,21 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from myorch.__about__ import __version__
-from myorch.bridge.ergo_config import generate_ergo_config
-from myorch.bridge.ergo_fetch import download_ergo, parse_version_pin
-from myorch.bridge.server import ErgoServer
-from myorch.bridge.weechat_link import detect_weechat_plugin_dir, repo_plugin_path
-from myorch.config import load_settings
-from myorch.db import connect, init_schema
-from myorch.services.memory_service import MemoryService
-from myorch.services.project_registry import ProjectRegistry
+from irclaude.__about__ import __version__
+from irclaude.bridge.ergo_config import generate_ergo_config
+from irclaude.bridge.ergo_fetch import download_ergo, parse_version_pin
+from irclaude.bridge.preflight import check_claude
+from irclaude.bridge.server import ErgoServer
+from irclaude.bridge.weechat_link import (
+    add_weechat_server_via_headless,
+    detect_weechat_plugin_dir,
+    repo_plugin_path,
+    weechat_running,
+)
+from irclaude.config import load_settings
+from irclaude.db import connect, init_schema
+from irclaude.services.memory_service import MemoryService
+from irclaude.services.project_registry import ProjectRegistry
 
 app = typer.Typer(help="Local IRC orchestrator for multi-project Claude Code.")
 console = Console()
@@ -47,15 +53,15 @@ async def _wait_for_port(host: str, port: int, deadline_s: float = 5.0) -> bool:
 async def _run_ergo_and_bridge(settings) -> None:
     import asyncio
 
-    from myorch.bridge import Bridge
+    from irclaude.bridge import Bridge
 
     if not settings.ergo_config.exists():
         raise RuntimeError(
-            f"ergo config not found at {settings.ergo_config} — run `myorch setup` first"
+            f"ergo config not found at {settings.ergo_config} — run `irclaude setup` first"
         )
     if not settings.ergo_binary.exists():
         raise RuntimeError(
-            f"ergo binary not found at {settings.ergo_binary} — run `myorch setup` first"
+            f"ergo binary not found at {settings.ergo_binary} — run `irclaude setup` first"
         )
 
     server = ErgoServer(
@@ -114,7 +120,7 @@ def start() -> None:
 
 @app.command()
 def stop() -> None:
-    """Stop a running myorch process via PID file."""
+    """Stop a running irclaude process via PID file."""
     settings = load_settings()
     if not settings.pid_file.exists():
         console.print("not running")
@@ -129,7 +135,7 @@ def stop() -> None:
 def status() -> None:
     """Show component + session status."""
     settings = load_settings()
-    table = Table(title="myorch status")
+    table = Table(title="irclaude status")
     table.add_column("component")
     table.add_column("state")
     if settings.pid_file.exists():
@@ -170,9 +176,35 @@ def _prompt_for_apps_root(default: Path) -> Path:
     return Path(raw).expanduser().resolve()
 
 
+def _print_claude_status() -> None:
+    status = check_claude()
+    if not status.installed:
+        console.print("[yellow]✗ claude CLI not found on PATH[/yellow]")
+        console.print(f"  {status.hint}")
+        return
+    label = status.version or "(version unknown)"
+    if status.auth_mode == "subscription":
+        console.print(f"[green]✓[/green] claude CLI {label} — using Pro/Max subscription")
+    elif status.auth_mode == "api_key":
+        console.print(f"[green]✓[/green] claude CLI {label} — using ANTHROPIC_API_KEY")
+    else:
+        console.print(f"[yellow]✗[/yellow] claude CLI {label} found but not authenticated")
+        console.print(f"  {status.hint}")
+
+
+@app.command()
+def doctor() -> None:
+    """Check that prerequisites (Claude Code CLI, auth) are satisfied."""
+    _print_claude_status()
+
+
 @app.command()
 def setup() -> None:
-    """First-run wizard: download ergo, scan projects, install plugin."""
+    """First-run wizard: verify prerequisites, download ergo, scan projects, configure WeeChat."""
+    console.print("[bold]Pre-flight checks[/bold]")
+    _print_claude_status()
+    console.print()
+
     settings = load_settings()
     settings.data_dir.mkdir(parents=True, exist_ok=True)
     settings.bin_dir.mkdir(parents=True, exist_ok=True)
@@ -183,7 +215,7 @@ def setup() -> None:
         expected_sha256=pin.sha256,
     )
 
-    if "MYORCH_APPS_ROOT" not in os.environ:
+    if "IRCLAUDE_APPS_ROOT" not in os.environ:
         chosen = _prompt_for_apps_root(settings.apps_root)
         if chosen != settings.apps_root:
             settings = settings.model_copy(update={"apps_root": chosen})
@@ -226,33 +258,93 @@ def setup() -> None:
 
     pdir = detect_weechat_plugin_dir()
     if pdir is None:
-        console.print("WeeChat plugin dir not detected — run [cyan]myorch setup-weechat[/cyan] manually.")
+        console.print(
+            "[yellow]WeeChat plugin dir not detected[/yellow] — run "
+            "[cyan]irclaude setup-weechat[/cyan] after installing WeeChat."
+        )
+        _print_next_steps(settings, weechat_configured=False)
         return
-    confirm = typer.prompt(f"Install WeeChat plugin into {pdir}? [y/N]", default="n")
+
+    confirm = typer.prompt(f"Install WeeChat plugin into {pdir}? [Y/n]", default="y")
     if confirm.lower().startswith("y"):
-        target = pdir / "myorch.py"
+        target = pdir / "irclaude.py"
         target.parent.mkdir(parents=True, exist_ok=True)
         if target.exists() or target.is_symlink():
             target.unlink()
         target.symlink_to(repo_plugin_path())
-        console.print(f"Linked plugin to {target}")
+        console.print(f"[green]✓[/green] Linked plugin to {target}")
+
+    server_configured = False
+    if weechat_running():
+        console.print(
+            "[yellow]WeeChat is currently running[/yellow] — skipping auto server config "
+            "(close WeeChat first, then rerun [cyan]irclaude setup-weechat[/cyan])."
+        )
+    else:
+        confirm = typer.prompt(
+            f"Auto-configure WeeChat server '{settings.host}/{settings.port}' (no-TLS)? [Y/n]",
+            default="y",
+        )
+        if confirm.lower().startswith("y"):
+            ok, msg = add_weechat_server_via_headless(
+                "irclaude", settings.host, settings.port
+            )
+            tag = "[green]✓[/green]" if ok else "[yellow]✗[/yellow]"
+            console.print(f"{tag} {msg}")
+            server_configured = ok
+
+    _print_next_steps(settings, weechat_configured=server_configured)
+
+
+def _print_next_steps(settings, *, weechat_configured: bool) -> None:
+    console.print()
+    console.print("[bold]Next steps[/bold]")
+    console.print(f"  1. Run [cyan]irclaude start[/cyan] to launch ergo + bridge")
+    if weechat_configured:
+        console.print(f"  2. In another terminal, run [cyan]weechat[/cyan] (auto-connects to irclaude)")
+        console.print(f"  3. In WeeChat, run [cyan]/python load irclaude.py[/cyan] then [cyan]/join #yourproject[/cyan]")
+    else:
+        console.print(f"  2. In another terminal, run [cyan]weechat[/cyan]")
+        console.print(
+            f"  3. In WeeChat, run "
+            f"[cyan]/server add irclaude {settings.host}/{settings.port} -notls -autoconnect[/cyan]"
+        )
+        console.print(f"     then [cyan]/connect irclaude[/cyan] and [cyan]/python load irclaude.py[/cyan]")
 
 
 @app.command(name="setup-weechat")
 def setup_weechat() -> None:
+    """Install the WeeChat plugin and (optionally) configure the irclaude server."""
+    settings = load_settings()
     pdir = detect_weechat_plugin_dir()
     if pdir is None:
         console.print(
             "Could not detect WeeChat plugin dir. To install manually:\n"
-            "  ln -s <repo>/weechat_plugin/myorch.py "
-            "$WEECHAT_HOME/python/autoload/myorch.py"
+            "  ln -s <repo>/weechat_plugin/irclaude.py "
+            "$WEECHAT_HOME/python/autoload/irclaude.py"
         )
         return
-    target = pdir / "myorch.py"
+    target = pdir / "irclaude.py"
     if target.exists() or target.is_symlink():
         target.unlink()
     target.symlink_to(repo_plugin_path())
-    console.print(f"Linked plugin to {target}")
+    console.print(f"[green]✓[/green] Linked plugin to {target}")
+
+    if weechat_running():
+        console.print(
+            "[yellow]WeeChat is running[/yellow] — close it before configuring the server."
+        )
+        return
+    confirm = typer.prompt(
+        f"Auto-configure WeeChat server '{settings.host}/{settings.port}' (no-TLS)? [Y/n]",
+        default="y",
+    )
+    if confirm.lower().startswith("y"):
+        ok, msg = add_weechat_server_via_headless(
+            "irclaude", settings.host, settings.port
+        )
+        tag = "[green]✓[/green]" if ok else "[yellow]✗[/yellow]"
+        console.print(f"{tag} {msg}")
 
 
 @app.command(name="list")
@@ -329,5 +421,5 @@ def logs() -> None:
 
 @app.command()
 def version() -> None:
-    """Print the myorch version."""
+    """Print the irclaude version."""
     console.print(__version__)
