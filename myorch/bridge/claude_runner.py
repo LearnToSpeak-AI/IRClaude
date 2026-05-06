@@ -2,9 +2,14 @@ import asyncio
 import contextlib
 import json
 import shutil
+import uuid as _uuid
 from dataclasses import dataclass
 from pathlib import Path
+from pathlib import Path as _Path
 from typing import AsyncIterator
+
+from myorch.models import Project as _Project
+from myorch.services.memory_service import MemoryService as _MemoryService
 
 
 @dataclass
@@ -86,3 +91,33 @@ class ClaudeRunner:
                 exit_code=proc.returncode or 0,
                 stderr=stderr_b.decode("utf-8", errors="replace"),
             )
+
+
+def _claude_conversation_exists(
+    claude_uuid: str,
+    *,
+    search_root: _Path | None = None,
+) -> bool:
+    root = search_root if search_root is not None else _Path.home() / ".claude" / "projects"
+    if not root.exists():
+        return False
+    for proj_dir in root.iterdir():
+        if (proj_dir / f"{claude_uuid}.jsonl").exists():
+            return True
+    return False
+
+
+def resolve_claude_uuid(
+    memory: _MemoryService,
+    project: _Project,
+    session_id: int,
+    *,
+    search_root: _Path | None = None,
+) -> str:
+    candidate = project.last_session_id
+    if candidate and _claude_conversation_exists(candidate, search_root=search_root):
+        memory.set_claude_session_id(session_id, candidate)
+        return candidate
+    fresh = str(_uuid.uuid4())
+    memory.set_claude_session_id(session_id, fresh)
+    return fresh
