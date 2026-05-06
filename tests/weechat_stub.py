@@ -1,4 +1,5 @@
 """Tiny in-process stand-in for the WeeChat embedded `weechat` module."""
+import inspect
 from collections import defaultdict
 from typing import Any, Callable
 
@@ -10,6 +11,18 @@ _bar_items: dict[str, Callable[..., str]] = {}
 _commands: dict[str, Callable[..., int]] = {}
 _printed: list[tuple[str, str]] = []
 _printed_y: list[tuple[str, int, str]] = []
+
+
+def _resolve(callback):
+    """If callback is a string (real-WeeChat convention), resolve it via the
+    caller's module globals. Otherwise return as-is."""
+    if not isinstance(callback, str):
+        return callback
+    for frame_info in inspect.stack()[1:]:
+        cb = frame_info.frame.f_globals.get(callback)
+        if callable(cb):
+            return cb
+    return callback
 
 
 def reset() -> None:
@@ -27,17 +40,17 @@ def register(name, author, version, license_, desc, shutdown_cb, charset):
 
 
 def hook_modifier(name, callback, data=""):
-    _modifiers[name] = callback
+    _modifiers[name] = _resolve(callback)
     return f"modifier:{name}"
 
 
 def hook_signal(name, callback, data=""):
-    _handlers[name].append(callback)
+    _handlers[name].append(_resolve(callback))
     return f"signal:{name}"
 
 
 def hook_command(name, desc, args, args_desc, completion, callback, data=""):
-    _commands[name] = callback
+    _commands[name] = _resolve(callback)
     return f"command:{name}"
 
 
@@ -85,7 +98,7 @@ def prnt_y(buffer, y, text):
 
 
 def bar_item_new(name, callback, data=""):
-    _bar_items[name] = callback
+    _bar_items[name] = _resolve(callback)
     return name
 
 

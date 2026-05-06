@@ -163,15 +163,15 @@ weechat.register(
     "shutdown_cb",
     "",
 )
-weechat.hook_modifier("irc_in2_privmsg", cb_modifier_privmsg, "")
-weechat.bar_item_new("myorch_status", cb_bar_status, "")
-weechat.hook_signal("*,irc_in2_join", cb_signal_join, "")
+weechat.hook_modifier("irc_in2_privmsg", "cb_modifier_privmsg", "")
+weechat.bar_item_new("myorch_status", "cb_bar_status", "")
+weechat.hook_signal("*,irc_in2_join", "cb_signal_join", "")
 weechat.hook_command(
     "myorch",
     "myorch helpers",
     "[projects|recall|search|decisions|close|agents] <args>",
     "subcommand args",
     "",
-    cb_command_myorch,
+    "cb_command_myorch",
     "",
 )
