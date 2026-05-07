@@ -54,21 +54,45 @@ def cb_signal_join(data, signal, signal_data):
 
 
 def cb_modifier_privmsg(data, modifier, modifier_data, line):
-    parsed = weechat.info_get_hashtable("irc_message_parse", {"message": line})
-    tags = _parse_tags(parsed.get("tags", ""))
+    # Defensive: must NEVER return anything other than the original line on
+    # error. Returning None or raising silently drops the message in WeeChat,
+    # which is how rendered chat output disappeared for the user.
+    try:
+        parsed = weechat.info_get_hashtable("irc_message_parse", {"message": line}) or {}
+        tags = _parse_tags(parsed.get("tags", ""))
 
-    chan = parsed.get("channel") or _STATUS["channel"]
-    if chan and chan.startswith("#"):
-        _STATUS["channel"] = chan
-    if "+irclaude.turn-id" in tags:
-        try:
-            _STATUS["turn"] = int(tags["+irclaude.turn-id"])
-        except ValueError:
-            pass
-    if "+irclaude.session-id" in tags:
-        _STATUS["session"] = tags["+irclaude.session-id"]
-
+        chan = parsed.get("channel") or _STATUS["channel"]
+        if chan and chan.startswith("#"):
+            _STATUS["channel"] = chan
+        if "+irclaude.turn-id" in tags:
+            try:
+                _STATUS["turn"] = int(tags["+irclaude.turn-id"])
+            except ValueError:
+                pass
+        if "+irclaude.session-id" in tags:
+            _STATUS["session"] = tags["+irclaude.session-id"]
+    except Exception:
+        pass
     return line
+
+
+def cb_modifier_print(data, modifier, modifier_data, string):
+    """mIRC-style nick wrap: `<nick>` instead of bare `nick` on chat lines.
+
+    Defensive: any failure must return the original string so the print path
+    isn't broken. Returning None would suppress the line entirely.
+    """
+    try:
+        if "\t" not in string:
+            return string
+        if "irc_privmsg" not in modifier_data:
+            return string
+        prefix, _, message = string.partition("\t")
+        if prefix.startswith("<"):
+            return string
+        return "<" + prefix + ">\t" + message
+    except Exception:
+        return string
 
 
 def cb_command_irclaude(data, buffer, args):
@@ -98,6 +122,7 @@ weechat.register(
 )
 weechat.hook_modifier("irc_in2_privmsg", "cb_modifier_privmsg", "")
 weechat.hook_modifier("irc_in2_batch", "cb_modifier_privmsg", "")
+weechat.hook_modifier("weechat_print", "cb_modifier_print", "")
 weechat.bar_item_new("irclaude_status", "cb_bar_status", "")
 weechat.hook_signal("*,irc_in2_join", "cb_signal_join", "")
 weechat.hook_command(

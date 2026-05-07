@@ -12,6 +12,9 @@ local_data/
 *.db
 *.db-shm
 *.db-wal
+ircd.lock
+bridge.log
+bridge.pid
 
 # ergo binary (downloaded at setup)
 bin/ergo

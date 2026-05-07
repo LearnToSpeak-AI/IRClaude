@@ -21,14 +21,16 @@ def test_plain_text_passes_through():
     assert msg.tags["+irclaude.kind"] == "text"
 
 
-def test_multiline_text_uses_multiline_batch():
+def test_multiline_text_emits_one_privmsg_per_line():
+    """WeeChat 4.1 doesn't surface assembled draft/multiline BATCHes to the
+    print pipeline — content disappears. Bridge sends one PRIVMSG per line so
+    each row renders with its own `<claude>` prefix."""
     buf = CodeBlockBuffer(channel="#p", session_id="s", turn_id=1)
     out = buf.feed("first paragraph\nsecond paragraph")
     out += buf.flush()
     parsed = [parse_line(l) for l in out]
-    assert parsed[0].command == "BATCH"
-    assert parsed[0].params[1] == "draft/multiline"
-    bodies = [p.params[1] for p in parsed if p.command == "PRIVMSG"]
+    assert all(p.command == "PRIVMSG" for p in parsed)
+    bodies = [p.params[1] for p in parsed]
     assert bodies == ["first paragraph", "second paragraph"]
 
 

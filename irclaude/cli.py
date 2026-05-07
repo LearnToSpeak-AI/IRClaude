@@ -18,9 +18,11 @@ from irclaude.bridge.preflight import check_claude
 from irclaude.bridge.server import ErgoServer
 from irclaude.bridge.weechat_link import (
     add_weechat_server_via_headless,
+    configure_weechat_layout_via_headless,
     detect_weechat_install_plan,
     detect_weechat_plugin_dir,
     install_weechat_headless,
+    remove_legacy_autoload_plugins,
     repo_plugin_path,
     weechat_running,
 )
@@ -133,9 +135,12 @@ def stop() -> None:
         console.print("not running")
         return
     pid = int(settings.pid_file.read_text(encoding="utf-8").strip())
-    os.kill(pid, _signal.SIGTERM)
+    try:
+        os.kill(pid, _signal.SIGTERM)
+        console.print(f"sent SIGTERM to {pid}")
+    except ProcessLookupError:
+        console.print(f"pid {pid} already dead — clearing stale pid file")
     settings.pid_file.unlink()
-    console.print(f"sent SIGTERM to {pid}")
 
 
 @app.command()
@@ -169,8 +174,12 @@ def up() -> None:
         settings.run_dir.mkdir(parents=True, exist_ok=True)
         log_file = settings.run_dir / "bridge.log"
         with open(log_file, "ab") as fh:
+            # `-u` forces unbuffered stdout/stderr so log prints land in
+            # bridge.log immediately. Without it Python full-buffers the file
+            # writes (8 KB chunks) and idle-timeout / exit messages stall in
+            # the buffer for many minutes, making hangs look mysterious.
             proc = subprocess.Popen(
-                [sys.executable, "-m", "irclaude", "start"],
+                [sys.executable, "-u", "-m", "irclaude", "start"],
                 stdout=fh,
                 stderr=subprocess.STDOUT,
                 stdin=subprocess.DEVNULL,
@@ -197,6 +206,14 @@ def up() -> None:
             )
             raise typer.Exit(code=1)
         console.print(f"[green]✓[/green] bridge started (logs: {log_file})")
+
+    if weechat_running():
+        console.print(
+            "[yellow]WeeChat is already running.[/yellow] Bridge is up; switch to "
+            "your existing WeeChat window. To pick up plugin changes, run "
+            "[cyan]/python reload irclaude[/cyan] there."
+        )
+        return
 
     console.print("[cyan]Launching WeeChat...[/cyan]")
     rc = subprocess.run(["weechat"]).returncode
@@ -307,12 +324,19 @@ def setup() -> None:
             settings = settings.model_copy(update={"apps_root": chosen})
 
     settings.etc_dir.mkdir(parents=True, exist_ok=True)
+    motd_path = settings.etc_dir / "ergo.motd"
+    motd_path.write_text(
+        "Welcome to IRClaude — local IRC bridge for Claude Code sessions.\n"
+        "Speak to claude in any project channel; the bridge handles the rest.\n",
+        encoding="utf-8",
+    )
     settings.ergo_config.write_text(
         generate_ergo_config(
             host=settings.host,
             port=settings.port,
             datastore_path=str(settings.data_dir / "ergo.db"),
             binary_path=settings.ergo_binary,
+            motd_path=str(motd_path),
         ),
         encoding="utf-8",
     )
@@ -459,7 +483,29 @@ def setup_weechat() -> None:
     target.symlink_to(repo_plugin_path())
     console.print(f"[green]✓[/green] Linked plugin to {target}")
 
+    for stale in remove_legacy_autoload_plugins(pdir):
+        console.print(f"[green]✓[/green] Removed legacy plugin {stale}")
+
     _configure_weechat_server(settings)
+
+
+@app.command(name="tune-weechat")
+def tune_weechat() -> None:
+    """Apply IRClaude's mIRC-flavored layout (top buflist, no time column,
+    narrow nicklist) so wide content like tables fits the chat area."""
+    if weechat_running():
+        console.print(
+            "[yellow]WeeChat is currently running.[/yellow] Close it first, "
+            "then rerun [cyan]irclaude tune-weechat[/cyan]."
+        )
+        return
+    ok, msg = configure_weechat_layout_via_headless()
+    tag = "[green]✓[/green]" if ok else "[yellow]✗[/yellow]"
+    console.print(f"{tag} {msg}")
+    if ok:
+        console.print(
+            "Restart WeeChat (or [cyan]irclaude up[/cyan]) to see the new layout."
+        )
 
 
 @app.command(name="list")

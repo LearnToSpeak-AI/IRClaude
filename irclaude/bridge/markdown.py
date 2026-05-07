@@ -32,14 +32,61 @@ def _split_row(line: str) -> list[str]:
     return [c.strip() for c in line.split("|")]
 
 
+# Target max width for rendered tables. The chat area in a typical IRClaude
+# WeeChat layout is ~110 chars after `irclaude tune-weechat`; tables wider than
+# this wrap at the terminal edge and lose grid alignment.
+_TABLE_TARGET_WIDTH = 110
+
+
+def _column_max_widths(headers: list[str], body: list[list[str]]) -> list[int]:
+    rows = [headers] + body
+    widths = [0] * len(headers)
+    for row in rows:
+        for i, cell in enumerate(row[: len(headers)]):
+            widths[i] = max(widths[i], len(cell))
+    return widths
+
+
+def _fit_column_widths(natural: list[int], total_target: int) -> list[int]:
+    """Shrink wide columns proportionally until the table fits `total_target`.
+
+    Each column reserves 3 chars for borders+padding. Columns narrower than 12
+    chars are kept as-is; wider columns share the remaining width.
+    """
+    n = len(natural)
+    if n == 0:
+        return natural
+    overhead = 3 * n + 1
+    budget = max(total_target - overhead, 12 * n)
+    if sum(natural) <= budget:
+        return natural
+    fixed_floor = 12
+    fixed = [w for w in natural if w <= fixed_floor]
+    flex_indices = [i for i, w in enumerate(natural) if w > fixed_floor]
+    flex_budget = budget - sum(fixed)
+    flex_total = sum(natural[i] for i in flex_indices) or 1
+    out = list(natural)
+    for i in flex_indices:
+        share = max(fixed_floor, int(natural[i] * flex_budget / flex_total))
+        out[i] = share
+    return out
+
+
 def _render_table(block: str) -> str:
     rows = [r for r in block.strip().split("\n") if r.strip()]
     if len(rows) < 2:
         return block
     headers = _split_row(rows[0])
     body = [_split_row(r) for r in rows[2:]]
+    natural = _column_max_widths(headers, body)
+    fitted = _fit_column_widths(natural, _TABLE_TARGET_WIDTH)
     try:
-        return tabulate(body, headers=headers, tablefmt="rounded_grid")
+        return tabulate(
+            body,
+            headers=headers,
+            tablefmt="rounded_grid",
+            maxcolwidths=fitted,
+        )
     except Exception:
         return block
 

@@ -22,16 +22,16 @@ def encode_batch(
         params=[f"+{batch_id}", type_, target],
         tags=dict(tags),
     )
+    # Force `:` prefix on every content line. The default encoder only adds the
+    # leading colon when the trailing param has spaces or starts with `:`, but
+    # multiline batches with content lines lacking the colon (e.g. box-drawing
+    # borders like `╭───╮`) confuse some servers' framing and the BATCH
+    # silently fails to deliver.
     body = [
-        Message(
-            command="PRIVMSG",
-            params=[target, line],
-            tags={"batch": batch_id},
-        )
-        for line in contents
+        f"@batch={batch_id} PRIVMSG {target} :{line}\r\n" for line in contents
     ]
     close_msg = Message(command="BATCH", params=[f"-{batch_id}"])
-    return [open_msg.encode(), *(b.encode() for b in body), close_msg.encode()]
+    return [open_msg.encode(), *body, close_msg.encode()]
 
 
 def encode_multiline(

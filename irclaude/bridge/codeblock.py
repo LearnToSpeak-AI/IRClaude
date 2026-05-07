@@ -6,6 +6,7 @@ from pygments.lexers import get_lexer_by_name
 from pygments.util import ClassNotFound
 
 from irclaude.bridge.markdown import markdown_to_irc
+from irclaude.irc.messages import Message
 from irclaude.irc.protocol import encode_batch, encode_multiline, new_batch_id
 
 
@@ -62,9 +63,19 @@ class CodeBlockBuffer:
             return []
         tags = self._common_tags()
         tags["+irclaude.kind"] = "text"
-        return encode_multiline(
-            target=self.channel, content=markdown_to_irc(text), tags=tags
-        )
+        # WeeChat 4.1's draft/multiline support doesn't surface assembled
+        # batches to the print pipeline, so the BATCH'd content disappears.
+        # Emit one PRIVMSG per line — each row renders independently with the
+        # `<claude>` prefix repeated.
+        rendered = markdown_to_irc(text)
+        return [
+            Message(
+                command="PRIVMSG",
+                params=[self.channel, line or " "],
+                tags=dict(tags),
+            ).encode()
+            for line in rendered.split("\n")
+        ]
 
     def _emit_code_block(self, lang: str, lines: list[str]) -> list[str]:
         if not lines:

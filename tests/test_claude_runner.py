@@ -67,5 +67,8 @@ async def test_run_turn_includes_required_flags(tmp_path):
     assert "stream-json" in argv
     assert "--mcp-config" in argv
     assert str(mcp) in argv
-    assert any("digest.md" in a for a in argv)
+    # Digest body is passed inline (not the file path) because claude 2.1.x
+    # only supports --append-system-prompt <prompt>, not the -file variant.
+    assert "--append-system-prompt" in argv
+    assert "d" in argv
     assert "hello" in argv

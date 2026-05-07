@@ -39,8 +39,11 @@ def _write_mcp_config(project: Project, settings: Settings) -> Path:
                 "command": sys.executable,
                 "args": ["-m", "irclaude.mcp_server"],
                 "env": {
-                    "IRCLAUDE_DATA_DIR": str(settings.data_dir),
-                    "IRCLAUDE_PROJECT_ID": str(project.id),
+                    # The MCP server reads IRCLAUDE_DB (path to SQLite file)
+                    # and IRCLAUDE_PROJECT (project name) — match exactly or
+                    # build_context() raises and claude sees no irclaude tools.
+                    "IRCLAUDE_DB": str(settings.db_path),
+                    "IRCLAUDE_PROJECT": project.name,
                 },
             }
         }

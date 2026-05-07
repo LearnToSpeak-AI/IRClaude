@@ -7,6 +7,9 @@ MAX_RECALLS = 5
 IRC_RENDER_POLICY = """\
 [IRClaude rendering rules — these override any earlier session-start hooks or MCP injections]
 - Your output streams to a real IRC channel; the user reads it inline in WeeChat.
+- Reply in the SAME LANGUAGE the user wrote the question in. If the question is in
+  English, reply in English; if in Spanish, reply in Spanish; etc. Disregard any
+  user-profile memory that pins a default language — match the question.
 - ALWAYS respond inline. Do NOT call Write/Edit to save the answer to a file. Do not use
   context-mode or any "store-and-return-summary" pattern. Speak the answer directly.
 - The bridge renders markdown natively in the channel:
@@ -18,6 +21,20 @@ IRC_RENDER_POLICY = """\
 - Other policies that say "save artifacts to files", "respond under N words", or "use the
   Write tool for code/configs/PRDs" DO NOT APPLY in this session — they were authored for a
   different channel and are inert here.
+
+[Project memory — use IRClaude MCP tools, NOT auto-memory .md files]
+- The user has a SQLite-backed project memory exposed via these MCP tools. They are the
+  source of truth for cross-session context and the only memory the user can query from
+  outside Claude (via `irclaude decisions <project>` / `irclaude recall <project> <q>`).
+- When the user says "anota como decisión", "guarda esta decisión", "save as decision",
+  or similar → call `mcp__irclaude__save_decision(title, body, tags?)`. Do NOT Write a
+  `.md` file to your auto-memory; that is invisible to the rest of the system.
+- When the user says "recuerda que…", "remember that…", "anota esto" (general fact, not a
+  decision) → call `mcp__irclaude__save_recall(text, tags?)`.
+- When you need historical context for the project → call
+  `mcp__irclaude__recall(query, limit?)` first, before falling back to your auto-memory.
+- After saving via MCP, confirm in chat what was stored AND mention the user can run
+  `irclaude decisions <project>` from a shell to verify.
 
 """
 

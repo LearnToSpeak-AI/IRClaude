@@ -82,8 +82,9 @@ def test_up_spawns_python_dash_m_irclaude_not_irclaude_cli(tmp_path: Path, monke
     assert result.exit_code == 0, result.stdout
     assert captured, "expected Popen to be called"
     argv = captured[0]
-    assert argv[1:3] == ["-m", "irclaude"], (
-        f"spawn argv must be `python -m irclaude start`, got {argv!r}"
+    # argv may include `-u` (unbuffered) before `-m irclaude`.
+    assert "-m" in argv and argv[argv.index("-m") + 1] == "irclaude", (
+        f"spawn argv must include `-m irclaude`, got {argv!r}"
     )
     assert argv[-1] == "start"
 
@@ -105,6 +106,8 @@ def test_up_skips_spawn_when_bridge_already_running(tmp_path: Path, monkeypatch)
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     monkeypatch.setattr("irclaude.cli.shutil.which", lambda name: "/usr/bin/weechat")
     monkeypatch.setattr("irclaude.cli._pid_alive", lambda pid: True)
+    # Pretend WeeChat is NOT already running so `up` proceeds to launch it.
+    monkeypatch.setattr("irclaude.cli.weechat_running", lambda: False)
 
     spawn_calls: list = []
     monkeypatch.setattr(

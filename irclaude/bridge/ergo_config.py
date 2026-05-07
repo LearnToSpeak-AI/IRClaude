@@ -19,6 +19,7 @@ def _patch_overrides(
     port: int,
     server_name: str,
     datastore_path: str,
+    motd_path: str | None = None,
 ) -> dict:
     config.setdefault("server", {})
     config["server"]["name"] = server_name
@@ -26,6 +27,8 @@ def _patch_overrides(
     config["server"]["casemapping"] = "ascii"
     config["server"]["enable-rfc3339-time"] = True
     config["server"].setdefault("compatibility", {})["allow-truncation"] = False
+    if motd_path is not None:
+        config["server"]["motd"] = motd_path
     config.setdefault("accounts", {})
     config["accounts"]["authentication-enabled"] = False
     config["accounts"].setdefault("registration", {})["enabled"] = True
@@ -57,6 +60,7 @@ def generate_ergo_config(
     server_name: str = "irclaude.local",
     datastore_path: str = "ircd.db",
     binary_path: Path | str | None = None,
+    motd_path: str | None = None,
 ) -> str:
     """Return a YAML ergo config string for a loopback IRCv3 server.
 
@@ -81,6 +85,7 @@ def generate_ergo_config(
                 port=port,
                 server_name=server_name,
                 datastore_path=datastore_path,
+                motd_path=motd_path,
             ),
             sort_keys=False,
         )

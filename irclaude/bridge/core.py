@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import re
 import signal as _signal
 from pathlib import Path
 
@@ -42,6 +43,50 @@ def _wrap_prompt(prompt: str) -> str:
     return _PROMPT_PREFIX + prompt
 
 
+_NICK_SAFE = re.compile(r"[^a-z0-9-]")
+
+
+def _detect_task_lifecycle(
+    event: dict,
+    active_tasks: dict[str, str],
+    counter: dict[str, int],
+) -> tuple[list[str], list[str]]:
+    """Walk a stream-json event looking for Task tool_use / tool_result events.
+
+    Returns (newly_started_nicks, newly_ended_nicks). Mutates ``active_tasks``
+    (task_id -> nick) and ``counter`` (slug -> next index) so callers track
+    state across the turn.
+    """
+    starts: list[str] = []
+    ends: list[str] = []
+    et = event.get("type")
+    if et == "assistant":
+        msg = event.get("message") or {}
+        for item in msg.get("content") or []:
+            # Claude CLI 2.1.x renames the Task tool to "Agent" in its
+            # stream-json output. Accept both for forward/backward compat.
+            if item.get("type") == "tool_use" and item.get("name") in {"Agent", "Task"}:
+                task_id = item.get("id") or ""
+                if not task_id or task_id in active_tasks:
+                    continue
+                input_ = item.get("input") or {}
+                raw = (input_.get("subagent_type") or "agent").lower()
+                slug = _NICK_SAFE.sub("", raw)[:12] or "agent"
+                counter[slug] = counter.get(slug, 0) + 1
+                nick = f"{slug}-{counter[slug]}"
+                active_tasks[task_id] = nick
+                starts.append(nick)
+    elif et == "user":
+        msg = event.get("message") or {}
+        for item in msg.get("content") or []:
+            if item.get("type") == "tool_result":
+                tool_use_id = item.get("tool_use_id") or ""
+                nick = active_tasks.pop(tool_use_id, None)
+                if nick is not None:
+                    ends.append(nick)
+    return starts, ends
+
+
 class Bridge:
     def __init__(
         self,
@@ -74,6 +119,7 @@ class Bridge:
         await self.client.expect("001")
         for chan in self.router.channels_for_known_projects():
             await self.client.join(chan)
+            await self._set_topic_for_channel(chan)
         self.router.set_runner(self._handle_turn)
 
         async for msg in self.client.stream():
@@ -84,6 +130,12 @@ class Bridge:
             target = msg.params[0]
             text = msg.params[1] if len(msg.params) > 1 else ""
             if msg.prefix and msg.prefix.startswith(self.bot_nick):
+                continue
+            # Any PRIVMSG that carries an `+irclaude.*` tag was emitted by
+            # this bridge (main claude or one of its sub-agents) and must NOT
+            # trigger another turn. Without this filter, the sub-agent's
+            # `<explore-1>` chatter loops back as fake user input.
+            if any(k.startswith("+irclaude.") for k in msg.tags):
                 continue
             if not target.startswith("#"):
                 continue
@@ -103,6 +155,12 @@ class Bridge:
             f"[bridge] turn {turn_id} on {channel} ({project.name}, {mode} {ctx.claude_uuid}): "
             f"{prompt!r}"
         )
+        # Refresh the channel topic with the current question so the title
+        # bar acts like a "now-working-on" indicator.
+        topic_hint = prompt.strip().splitlines()[0] if prompt.strip() else None
+        if topic_hint and len(topic_hint) > 80:
+            topic_hint = topic_hint[:77] + "..."
+        await self._set_topic_for_channel(channel, hint=topic_hint)
 
         runner = ClaudeRunner(
             cwd=Path(project.path),
@@ -113,30 +171,75 @@ class Bridge:
             is_resume=ctx.is_resume,
         )
         buffer = CodeBlockBuffer(channel=channel, session_id=ctx.claude_uuid, turn_id=turn_id)
+        # Per-turn Task lifecycle tracking: claude 2.1.x emits a `tool_use`
+        # named "Agent" (formerly "Task") for each subagent dispatch and a
+        # matching `tool_result` when it ends. Translate those into
+        # agent_start/agent_end so a real IRC client JOIN/PARTs the channel.
+        active_tasks: dict[str, str] = {}
+        agent_counter: dict[str, int] = {}
         try:
             async for event in runner.run_turn(_wrap_prompt(prompt)):
+                task_starts, task_ends = _detect_task_lifecycle(
+                    event, active_tasks, agent_counter
+                )
+                for nick in task_starts:
+                    await self.agents.agent_start(nick, channel)
                 starts, ends, normal = classify_agent_events([event])
                 for s in starts:
                     await self.agents.agent_start(s["name"], channel)
+                # Route any event whose parent_tool_use_id matches an active
+                # subagent through that subagent's IRC client so its tool
+                # calls and intermediate text appear as `<explore-1>`, not
+                # `<@claude>`.
+                parent_id = event.get("parent_tool_use_id")
+                sub_nick = active_tasks.get(parent_id) if parent_id else None
                 for n in normal:
                     msgs = translate(
                         n,
                         channel=channel,
                         session_id=ctx.claude_uuid,
                         turn_id=turn_id,
-                        agent_nick=n.get("subagent"),
+                        agent_nick=sub_nick,
                     )
                     for m in msgs:
                         text = m.params[1] if len(m.params) > 1 else ""
-                        if m.tags.get("+irclaude.kind") in {"text", "agent-msg"}:
+                        kind = m.tags.get("+irclaude.kind")
+                        if sub_nick:
+                            # Subagent stream: skip the codeblock buffer and
+                            # emit each rendered line directly from its own
+                            # IRC client.
+                            from irclaude.bridge.markdown import markdown_to_irc
+                            if kind in {"text", "agent-msg"}:
+                                rendered = markdown_to_irc(text)
+                                for line in rendered.split("\n"):
+                                    await self.agents.agent_say(
+                                        sub_nick,
+                                        channel,
+                                        Message(
+                                            command="PRIVMSG",
+                                            params=[channel, line or " "],
+                                            tags=dict(m.tags),
+                                        ),
+                                    )
+                            else:
+                                await self.agents.agent_say(sub_nick, channel, m)
+                        elif kind in {"text", "agent-msg"}:
                             for line in buffer.feed(text + "\n"):
                                 await self._send_raw(line)
                         else:
                             await self.client.send(m)
                 for e in ends:
                     await self.agents.agent_end(e["name"], channel)
+                for nick in task_ends:
+                    await self.agents.agent_end(nick, channel)
             for line in buffer.flush():
                 await self._send_raw(line)
+            # Defensive: any task that never received a tool_result (claude
+            # crashed mid-task, etc.) should still PART so the nick doesn't
+            # linger in the channel.
+            for nick in list(active_tasks.values()):
+                with contextlib.suppress(Exception):
+                    await self.agents.agent_end(nick, channel)
         except Exception as exc:
             print(f"[bridge] turn {turn_id} on {channel} failed: {exc!r}")
         result = runner.last_result
@@ -150,6 +253,31 @@ class Bridge:
         assert self.client is not None
         line = wire_line.rstrip("\r\n")
         await self.client._send_raw(line)
+
+    async def _set_topic_for_channel(self, channel: str, hint: str | None = None) -> None:
+        """Populate the channel topic so WeeChat's title bar isn't a blank
+        band. Default topic is `<project>: <last decision or hint>`. Falls back
+        to the channel name if nothing else is known.
+        """
+        if self.client is None:
+            return
+        # Always prefix with the channel name (e.g. `#controller`) so the
+        # title bar reads `#controller: <topic>` even before any decision is
+        # known.
+        text = channel
+        project = self.router.project_for_channel(channel)
+        tail = hint
+        if not tail and project is not None:
+            decisions = self.memory.list_decisions(project.id)
+            if decisions:
+                tail = decisions[0].title
+        if tail:
+            text = f"{channel}: {tail}"
+        text = text.replace("\n", " ").replace("\r", " ")
+        if len(text) > 200:
+            text = text[:197] + "..."
+        with contextlib.suppress(Exception):
+            await self.client._send_raw(f"TOPIC {channel} :{text}")
 
     def _ensure_control_handlers(self) -> None:
         if hasattr(self, "_control_handlers"):

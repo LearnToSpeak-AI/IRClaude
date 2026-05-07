@@ -53,8 +53,10 @@ def test_prepare_session_writes_per_project_mcp_json(tmp_path):
     assert "irclaude" in data["mcpServers"]
     server = data["mcpServers"]["irclaude"]
     assert server["command"]
-    assert "IRCLAUDE_DATA_DIR" in server.get("env", {})
-    assert server["env"]["IRCLAUDE_PROJECT_ID"] == str(proj.id)
+    # The MCP server reads IRCLAUDE_DB (path to db file) and IRCLAUDE_PROJECT
+    # (project name) — see irclaude/mcp_server.py:build_context.
+    assert "IRCLAUDE_DB" in server.get("env", {})
+    assert server["env"]["IRCLAUDE_PROJECT"] == proj.name
 
 
 def test_prepare_session_returns_paths_in_context(tmp_path):
