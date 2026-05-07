@@ -21,10 +21,19 @@ WeeChat ── ergo (127.0.0.1:6667) ── Python bridge ── claude -p
                                                        └─ SQLite memory + MCP
 ```
 
+![Claude replying in a channel with a rendered markdown table](screenshots/claude-replies-in-channel.png)
+
+*Claude shows up as a regular nick (`@claude`) and answers in the channel — markdown tables get rendered as ASCII grids, code spans get inline highlighting.*
+
 - **One channel per project.** `#myapp`, `#that-side-thing`, `#whatever`.
   Each maps to a folder under your `apps_root`.
 - **Sub-agents as nicks.** When Claude spawns an agent, it `JOIN`s the channel
   as a separate user (`<explore-1>`, `<reviewer-2>`) and `PART`s when done.
+
+  ![Sub-agent explore-1 joining the channel to handle a request](screenshots/agent-joins-channel.png)
+
+  *An `Explore` sub-agent joins `#flipper` as `explore-1` to scan the project — you watch the agent's lifecycle in the nicklist instead of guessing what's running in the background.*
+
 - **Memory across sessions.** Decisions, recalls, and per-turn context live in
   SQLite, exposed to Claude via an MCP server you can also query from the shell
   (`irclaude decisions <project>`, `irclaude search <query>`).
