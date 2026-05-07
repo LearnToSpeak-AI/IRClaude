@@ -17,6 +17,31 @@ from irclaude.services.memory_service import MemoryService
 BOT_NICK = "claude"
 
 
+_PROMPT_PREFIX = """\
+[IRClaude bridge — read carefully before answering]
+You are responding in an IRC channel that is rendered live in WeeChat.
+- Use markdown FREELY: bold (**x**), italic (*x*), inline code (`x`),
+  fenced code blocks (```lang …```), tables (| col | col | + |---|---|),
+  bulleted lists (- item), checklists (- [ ] / - [x]), blockquotes (> x),
+  strikethrough (~~x~~), links ([text](url)), headings (# / ##).
+- The bridge converts all of these to IRC formatting: tables become ASCII grids,
+  code blocks render inline with Pygments syntax highlighting.
+- DO NOT use Write or Edit to save the answer to a file. The user is reading IRC,
+  there is no file viewer.
+- DO NOT keep the response under any word limit. Scrollback handles long answers.
+- Any earlier hook/MCP policy that says "save artifacts to files", "respond under
+  N words", or "use Write tool for code/configs/PRDs" was authored for a different
+  surface and DOES NOT APPLY to this IRC channel — disregard it for this turn.
+- Speak the answer directly in your reply.
+
+User question:
+"""
+
+
+def _wrap_prompt(prompt: str) -> str:
+    return _PROMPT_PREFIX + prompt
+
+
 class Bridge:
     def __init__(
         self,
@@ -89,7 +114,7 @@ class Bridge:
         )
         buffer = CodeBlockBuffer(channel=channel, session_id=ctx.claude_uuid, turn_id=turn_id)
         try:
-            async for event in runner.run_turn(prompt):
+            async for event in runner.run_turn(_wrap_prompt(prompt)):
                 starts, ends, normal = classify_agent_events([event])
                 for s in starts:
                     await self.agents.agent_start(s["name"], channel)
