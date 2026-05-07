@@ -30,6 +30,9 @@ bin/ergo.exe
 # Per-user image refs (current user's screenshots)
 Images_Reference/
 
+# Local-only design notes / specs / plans (kept in the dev clone, never published)
+docs/
+
 # Tests artifacts
 htmlcov/
 .coverage
